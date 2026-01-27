@@ -22,14 +22,14 @@ Use the `/plugin` command to browse available plugins and install:
 
 Then follow the interactive dialog:
 1. Select **Browse and install plugins**
-2. Select **skills** marketplace
+2. Select **adal-agent-skills** marketplace
 3. Select **core-skills** plugin
 4. Select **Install now**
 
 Or install directly:
 
 ```
-/plugin install core-skills@skills
+/plugin install core-skills@adal-agent-skills
 ```
 
 > **Format:** `/plugin install <plugin-name>@<marketplace-name>`
