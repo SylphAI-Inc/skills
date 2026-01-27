@@ -7,8 +7,8 @@
   "plugins": [
     {
       "name": "core-skills",
-      "description": "Essential skills for AdaL development and workflow",
-      "skills": ["create-skill"]
+      "source": "./",
+      "description": "Essential skills for AdaL development and workflow"
     }
   ]
 }
