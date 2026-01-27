@@ -1,31 +1,46 @@
 # AdaL Skills Marketplace
 
-Official collection of community-shareable skills for [AdaL CLI](https://sylph.ai).
+Official collection of community-shareable skills for [AdaL CLI](https://sylph.ai) and Claude Code.
 
 ## Installation
 
-### Option 1: Interactive Dialog
+> **Both AdaL CLI and Claude Code use the same commands.**
 
-1. Register the marketplace:
-   ```bash
-   /plugin marketplace add SylphAI-Inc/skills
-   ```
+### Step 1: Add the Marketplace
 
-2. Browse and install:
-   - Select **Browse and install plugins**
-   - Select **skills** (the marketplace)
-   - Select **core-skills**
-   - Select **Install now**
+```
+/plugin marketplace add SylphAI-Inc/skills
+```
 
-### Option 2: Direct Install
+### Step 2: Browse and Install
 
-Install plugins directly via command:
+Use the `/plugin` command to browse available plugins and install:
 
-```bash
+```
+/plugin
+```
+
+Then follow the interactive dialog:
+1. Select **Browse and install plugins**
+2. Select **skills** marketplace
+3. Select **core-skills** plugin
+4. Select **Install now**
+
+Or install directly:
+
+```
 /plugin install core-skills@skills
 ```
 
-> **Note:** The format is `/plugin install <plugin-name>@<marketplace-name>`. The marketplace name comes from `marketplace.json` (`"name": "skills"`), not the GitHub repo path.
+> **Format:** `/plugin install <plugin-name>@<marketplace-name>`
+
+### Step 3: View Available Skills
+
+After installation, see all your available skills:
+
+```
+/skills
+```
 
 ## Available Skills
 
@@ -41,7 +56,6 @@ See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on
 - **Personal skills** (`~/.adal/skills/`) - Private to you
 - **Project skills** (`.adal/skills/`) - Shared via git with your team
 - **Plugin skills** (GitHub repo) - Public, shareable via marketplace
-
 ## Repository Structure
 
 ```
