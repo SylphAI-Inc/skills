@@ -1,0 +1,14 @@
+{
+  "name": "skills",
+  "description": "Official AdaL Skills Marketplace - Community-shareable skills for AdaL CLI",
+  "version": "1.0.0",
+  "author": "SylphAI-Inc",
+  "homepage": "https://github.com/SylphAI-Inc/skills",
+  "plugins": [
+    {
+      "name": "core-skills",
+      "description": "Essential skills for AdaL development and workflow",
+      "skills": ["create-skill"]
+    }
+  ]
+}
