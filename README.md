@@ -1,6 +1,6 @@
 # AdaL Skills Marketplace
 
-Official collection of community-shareable skills for [AdaL CLI](https://github.com/SylphAI-Inc/adal).
+Official collection of community-shareable skills for [AdaL CLI](https://sylph.ai).
 
 ## Installation
 
