@@ -4,17 +4,28 @@ Official collection of community-shareable skills for [AdaL CLI](https://sylph.a
 
 ## Installation
 
-Add this skills repository to your AdaL installation:
+### Option 1: Interactive Dialog
+
+1. Register the marketplace:
+   ```bash
+   /plugin marketplace add SylphAI-Inc/skills
+   ```
+
+2. Browse and install:
+   - Select **Browse and install plugins**
+   - Select **skills** (the marketplace)
+   - Select **core-skills**
+   - Select **Install now**
+
+### Option 2: Direct Install
+
+Install plugins directly via command:
 
 ```bash
-/plugin marketplace add SylphAI-Inc/skills
+/plugin install core-skills@skills
 ```
 
-Or add specific plugins:
-
-```bash
-/plugin marketplace add SylphAI-Inc/skills@core-skills
-```
+> **Note:** The format is `/plugin install <plugin-name>@<marketplace-name>`. The marketplace name comes from `marketplace.json` (`"name": "skills"`), not the GitHub repo path.
 
 ## Available Skills
 
