@@ -79,33 +79,54 @@ Same `SKILL.md` format. Remember to commit to git for team sharing.
 
 ### For Plugin Skills (GitHub)
 
-1. Create a GitHub repository with structure:
+1. Create a GitHub repository with this structure:
    ```
    <repo>/
-   ├── marketplace.json     # Metadata for the marketplace
-   └── skills/
-       └── <skill-name>/
-           └── SKILL.md
+   ├── .claude-plugin/
+   │   └── marketplace.json     # Required location for Claude Code compatibility
+   ├── skills/
+   │   └── <skill-name>/
+   │       └── SKILL.md
+   └── README.md
    ```
 
-2. `marketplace.json` format:
+2. **marketplace.json** (MUST be in `.claude-plugin/` directory):
    ```json
    {
-     "name": "my-skills",
-     "description": "My collection of skills",
-     "version": "1.0.0",
-     "author": "your-username",
+     "name": "my-marketplace-name",
+     "owner": {
+       "name": "Your Name or Org",
+       "email": "contact@example.com"
+     },
+     "metadata": {
+       "description": "My collection of skills",
+       "version": "1.0.0"
+     },
      "plugins": [
        {
          "name": "my-plugin",
          "description": "Plugin description",
-         "skills": ["skill-name"]
+         "source": "./",
+         "skills": ["./skills/skill-name"]
        }
      ]
    }
    ```
 
-3. Users can install with: `/plugin marketplace add <owner>/<repo>`
+   **Critical fields:**
+   - `owner`: Object with `name` and `email` (required by Claude Code)
+   - `metadata`: Wrapper for `description` and `version`
+   - `plugins[].source`: Path to skills root (use `"./"` for repo root)
+   - `plugins[].skills`: Array of relative paths to skill directories
+
+3. **Installation commands:**
+   ```bash
+   # Add marketplace
+   /plugin marketplace add <owner>/<repo>
+   
+   # Direct install (marketplace-name from marketplace.json "name" field)
+   /plugin install <plugin-name>@<marketplace-name>
+   ```
 
 ## Step 4: Verify Installation
 
