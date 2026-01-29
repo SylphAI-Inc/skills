@@ -121,7 +121,9 @@ Same `SKILL.md` format. Remember to commit to git for team sharing.
    - `owner`: Object with `name` and `email` (required by Claude Code)
    - `metadata`: Wrapper for `description` and `version`
    - `plugins[].source`: Path to skills root (use `"./"` for repo root)
-   - `plugins[].skills`: Array of relative paths to skill directories
+   - `plugins[].skills`: **Two formats supported:**
+     - **Array** (explicit): `["./skills/xlsx", "./skills/docx"]` - list specific skill directories
+     - **String** (scan): `"skills"` or `"./"` - recursively scan for SKILL.md files
 
 3. **Installation commands:**
    ```bash
