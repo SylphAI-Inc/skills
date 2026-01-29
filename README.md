@@ -1,6 +1,6 @@
 # AdaL Skills Marketplace
 
-Official collection of community-shareable skills for [AdaL CLI](https://sylph.ai) and Claude Code.
+Essential skills for teams and developers building software with best engineering practices and 10x productivity. Compatible with [AdaL CLI](https://sylph.ai) and Claude Code.
 
 ## Installation
 

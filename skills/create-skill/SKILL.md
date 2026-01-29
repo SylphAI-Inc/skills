@@ -128,6 +128,15 @@ Same `SKILL.md` format. Remember to commit to git for team sharing.
    /plugin install <plugin-name>@<marketplace-name>
    ```
 
+4. **IMPORTANT: Keep marketplace.json in sync!**
+   
+   Every time you add a new skill to the plugin, update the `skills` array in `marketplace.json`:
+   ```json
+   "skills": ["./skills/create-skill", "./skills/new-skill-name"]
+   ```
+   
+   Without this, the skill won't be discoverable via `/skills` command after plugin installation.
+
 ## Step 4: Verify Installation
 
 After creating:
