@@ -1,3 +1,10 @@
+---
+name: posthog-analytics
+description: Automate PostHog dashboard creation, sync, and export via API
+author: SylphAI-Inc
+version: 1.0.0
+---
+
 # PostHog Analytics Skill
 
 Automate PostHog dashboard creation, sync, and export via API.
