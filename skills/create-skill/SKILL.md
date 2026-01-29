@@ -53,11 +53,13 @@ Ask for:
 mkdir -p ~/.adal/skills/<skill-name>
 ```
 
-Create `SKILL.md`:
+Create `SKILL.md` with **required YAML frontmatter**:
 ```markdown
 ---
 name: <skill-name>
 description: <Brief description>
+author: <your-name or org>
+version: 1.0.0
 ---
 
 # <Skill Title>
@@ -68,6 +70,8 @@ description: <Brief description>
 ## Instructions
 <Step-by-step guidance for the agent>
 ```
+
+> **⚠️ REQUIRED**: The `---` YAML frontmatter block is mandatory. Skills without it will fail to load. At minimum, include `name` and `description`.
 
 ### For Project Skills (`.adal/skills/`)
 
