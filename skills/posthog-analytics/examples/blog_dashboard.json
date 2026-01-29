@@ -1,0 +1,33 @@
+{
+  "name": "Blog Analytics",
+  "description": "Track blog performance, reader engagement, and top content",
+  "domain_filter": "blog.sylph.ai",
+  "dashboard_id": null,
+  "insights": [
+    {
+      "name": "Blog Pageviews (Total)",
+      "type": "pageviews_total",
+      "display": "BoldNumber",
+      "date_range": "-30d"
+    },
+    {
+      "name": "Unique Blog Readers",
+      "type": "unique_users",
+      "display": "BoldNumber",
+      "date_range": "-30d"
+    },
+    {
+      "name": "Top Blog Posts",
+      "type": "top_pages",
+      "display": "ActionsTable",
+      "breakdown": "$current_url",
+      "date_range": "-30d"
+    },
+    {
+      "name": "Blog Traffic Trend",
+      "type": "traffic_trend",
+      "display": "ActionsLineGraph",
+      "date_range": "-30d"
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PostHog Dashboard Config",
+  "description": "Version-controlled dashboard configuration for PostHog",
+  "type": "object",
+  "required": ["name", "insights"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Dashboard name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Dashboard description"
+    },
+    "domain_filter": {
+      "type": "string",
+      "description": "Domain to filter events (e.g., blog.sylph.ai)"
+    },
+    "dashboard_id": {
+      "type": "integer",
+      "description": "PostHog dashboard ID (set after creation)"
+    },
+    "insights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["pageviews_total", "unique_users", "traffic_trend", "top_pages", "custom"]
+          },
+          "display": {
+            "type": "string",
+            "enum": ["BoldNumber", "ActionsLineGraph", "ActionsTable", "ActionsBar"],
+            "default": "BoldNumber"
+          },
+          "event": {
+            "type": "string",
+            "default": "$pageview"
+          },
+          "math": {
+            "type": "string",
+            "enum": ["total", "dau", "weekly_active", "monthly_active"],
+            "default": "total"
+          },
+          "date_range": {
+            "type": "string",
+            "default": "-30d"
+          },
+          "breakdown": {
+            "type": "string",
+            "description": "Property to breakdown by (e.g., $current_url)"
+          },
+          "insight_id": {
+            "type": "integer",
+            "description": "PostHog insight ID (set after creation)"
+          }
+        }
+      }
+    }
+  }
+}

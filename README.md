@@ -49,6 +49,7 @@ After installation, see all your available skills:
 | Skill | Description |
 |-------|-------------|
 | [create-skill](./skills/create-skill/SKILL.md) | Guide for creating AdaL skills - personal, project, or plugin |
+| [posthog-analytics](./skills/posthog-analytics/SKILL.md) | Automate PostHog dashboard creation, sync, and export via API |
 
 ## Creating Your Own Skills
 
