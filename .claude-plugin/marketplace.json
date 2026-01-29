@@ -5,15 +5,15 @@
     "email": "contact@sylph.ai"
   },
   "metadata": {
-    "description": "Official AdaL Skills Marketplace - Community-shareable skills for AdaL CLI",
+    "description": "Essential skills for teams and developers building software with best engineering practices and 10x productivity",
     "version": "1.0.0"
   },
   "plugins": [
     {
       "name": "core-skills",
-      "description": "Essential skills for AdaL development and workflow",
+      "description": "Essential skills for teams and developers building software with best engineering practices and 10x productivity",
       "source": "./",
-      "skills": ["./skills/create-skill"]
+      "skills": ["./skills/create-skill", "./skills/posthog-analytics"]
     }
   ]
 }
