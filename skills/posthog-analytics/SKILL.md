@@ -1,154 +1,166 @@
 ---
 name: posthog-analytics
-description: Automate PostHog dashboard creation, sync, and export via API
+description: Automate PostHog dashboard creation, sync, update, and export via API
 author: SylphAI-Inc
-version: 1.0.0
+version: 1.1.0
 ---
 
 # PostHog Analytics Skill
 
-Automate PostHog dashboard creation, sync, and export via API.
-
-## When to Use
-
-- Setting up analytics dashboards for new projects
-- Syncing dashboard configs between environments (add new insights without duplicates)
-- Exporting existing dashboards to version-controlled configs
-- Querying PostHog events programmatically
+Automate PostHog dashboard creation, sync, update, and export via API.
 
 ## Prerequisites
 
+### Required Tools
+- `curl` - HTTP client (pre-installed on macOS/Linux)
+- `jq` - JSON processor: `brew install jq` or `apt install jq`
+- `bash` - Shell (the script is bash)
+
+### PostHog API Key
+
+1. Go to [PostHog Settings → Personal API Keys](https://us.posthog.com/settings/user-api-keys)
+2. Create a new key with read/write access
+3. Export it:
+
 ```bash
-# Required environment variable
-export POSTHOG_PERSONAL_API_KEY=phx_xxx  # Get from PostHog Settings → Personal API Keys
+export POSTHOG_PERSONAL_API_KEY=phx_xxx
 ```
 
-## Workflow
+**Note**: The API key determines your organization and project. The script uses `@current` project context (your default project).
 
-### 1. Create New Dashboard
+### Verify Setup
+
 ```bash
-./scripts/posthog_sync.sh create examples/blog_dashboard.json
+# Test your API key - should return your project info
+curl -s -H "Authorization: Bearer $POSTHOG_PERSONAL_API_KEY" \
+  "https://us.i.posthog.com/api/projects/@current/" | jq '{id, name}'
 ```
-Creates dashboard + all insights. Updates config with `dashboard_id`.
 
-### 2. Sync Changes (Add New Insights)
-```bash
-# Edit config to add new insights, then:
-./scripts/posthog_sync.sh sync examples/app_dashboard.json
-```
-Only creates NEW insights. Existing ones are detected by name and skipped.
-
-### 3. Export Existing Dashboard
-```bash
-./scripts/posthog_sync.sh export 1126158 > my_dashboard.json
-```
-Exports dashboard with all insight names and IDs.
-
-## Config Schema
-
+Expected output:
 ```json
 {
-  "name": "Dashboard Name",
-  "description": "Description",
-  "domain_filter": "app.sylph.ai",
-  "dashboard_id": null,
-  "insights": [
-    {
-      "name": "Pageviews (Total)",
-      "type": "pageviews_total",
-      "display": "BoldNumber",
-      "date_range": "-30d"
-    }
-  ]
+  "id": 209268,
+  "name": "Default project"
 }
 ```
 
-### Insight Types
+If you get an error, check your API key is correct and has proper permissions.
 
-| Type | Display | Math | Description |
-|------|---------|------|-------------|
-| `pageviews_total` | BoldNumber | total | Total pageview count |
-| `unique_users` | BoldNumber | dau | Daily unique users |
-| `traffic_trend` | ActionsLineGraph | total | Line chart over time |
-| `top_pages` | ActionsTable | total | Table with URL breakdown |
-| `custom` | Any | Any | Full control via params |
 
-### Math Options
+## Quick Start: Blog Analytics Example
 
-| Math | Description |
-|------|-------------|
-| `total` | Total count |
-| `dau` | Daily active users |
-| `weekly_active` | Weekly active users |
-| `monthly_active` | Monthly active users |
+### Step 1: Write Your Config
 
-### Display Options
+Create `blog_dashboard.json`:
 
-| Display | Description |
-|---------|-------------|
-| `BoldNumber` | Single large number |
-| `ActionsLineGraph` | Line chart |
-| `ActionsTable` | Table with breakdown |
-| `ActionsBar` | Vertical bar chart |
-
-## API Quick Reference
-
-```bash
-# List dashboards
-curl -H "Authorization: Bearer $KEY" "https://us.i.posthog.com/api/projects/@current/dashboards/"
-
-# Query events
-curl -H "Authorization: Bearer $KEY" "https://us.i.posthog.com/api/projects/@current/events?limit=100" | \
-  jq '.results[:5] | .[] | "\(.event) | \(.properties["$current_url"])"'
-
-# Filter events by domain
-curl -s -H "Authorization: Bearer $KEY" ".../events?limit=100" | \
-  jq '[.results[] | select(.properties["$current_url"] | contains("yourdomain"))] | length'
-```
-
-## Example Configs
-
-### Blog Analytics
 ```json
 {
   "name": "Blog Analytics",
-  "domain_filter": "blog.sylph.ai",
+  "description": "Track blog performance and reader engagement",
+  "filter": {"key": "source", "value": "blog"},
+  "dashboard_id": null,
   "insights": [
-    {"name": "Pageviews", "type": "pageviews_total"},
-    {"name": "Unique Readers", "type": "unique_users"},
-    {"name": "Traffic Trend", "type": "traffic_trend"},
-    {"name": "Top Posts", "type": "top_pages"}
+    {"name": "Blog Pageviews (Total)", "type": "pageviews_total"},
+    {"name": "Unique Blog Readers", "type": "unique_users"},
+    {"name": "Blog Traffic Trend", "type": "traffic_trend"},
+    {"name": "Top Blog Posts", "type": "top_pages"}
   ]
 }
 ```
 
-### App Product Metrics
-```json
-{
-  "name": "App Product Metrics",
-  "domain_filter": "app.sylph.ai",
-  "insights": [
-    {"name": "DAU", "type": "unique_users"},
-    {"name": "WAU", "type": "unique_users", "math": "weekly_active"},
-    {"name": "Pageviews", "type": "pageviews_total"},
-    {"name": "Usage Trend", "type": "traffic_trend"},
-    {"name": "Top Pages", "type": "top_pages"}
-  ]
-}
+**Note**: Set `dashboard_id: null` for new dashboards.
+
+### Step 2: Create Dashboard
+
+```bash
+./scripts/posthog_sync.sh create blog_dashboard.json
 ```
+
+**Output**:
+```
+Creating dashboard: Blog Analytics
+Dashboard created: ID 1166599
+Creating insight: Blog Pageviews (Total)
+{id: 6520531, name: "Blog Pageviews (Total)"}
+...
+Dashboard URL: https://us.posthog.com/project/209268/dashboard/1166599
+```
+
+The script:
+- Creates a new dashboard in your PostHog project
+- Returns **dashboard_id** (e.g., `1166599`) and **project_id** (e.g., `209268`) in the URL
+- **Automatically updates** your config file with the `dashboard_id`
+
+### Step 3: Add New Insights (Sync)
+
+Edit config to add new insights, then:
+
+```bash
+./scripts/posthog_sync.sh sync blog_dashboard.json
+```
+
+Only creates NEW insights. Existing ones (matched by name) are **skipped**.
+
+### Step 4: Update Existing Insights
+
+Changed your filter? Edit config, then:
+
+```bash
+./scripts/posthog_sync.sh update blog_dashboard.json
+```
+
+Updates ALL insights with current config settings. Use when changing filters.
+
+### Step 5: Export Existing Dashboard
+
+```bash
+./scripts/posthog_sync.sh export 1166599 > exported_dashboard.json
+```
+
+## Config Reference
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Dashboard name |
+| `description` | No | Dashboard description |
+| `filter` | No* | Event property filter: `{"key": "source", "value": "blog"}` |
+| `domain_filter` | No* | URL filter fallback: `"blog.sylph.ai"` |
+| `dashboard_id` | No | Set to `null` for create, or existing ID for sync/update |
+| `insights` | Yes | Array of insight objects |
+
+*At least one filter recommended. `filter` takes precedence over `domain_filter`.
+
+### Insight Types
+
+| Type | Display | Description |
+|------|---------|-------------|
+| `pageviews_total` | BoldNumber | Total pageview count |
+| `unique_users` | BoldNumber | Unique visitors (DAU) |
+| `traffic_trend` | LineGraph | Traffic over time |
+| `top_pages` | Table | Top pages breakdown |
+
+### Optional Insight Fields
+
+| Field | Default | Options |
+|-------|---------|---------|
+| `math` | `total` | `total`, `dau`, `weekly_active`, `monthly_active` |
+| `display` | Auto | `BoldNumber`, `ActionsLineGraph`, `ActionsTable` |
+| `date_range` | `-30d` | `-7d`, `-30d`, `-90d`, etc. |
+
+## Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `POSTHOG_PERSONAL_API_KEY` | Yes | - | Your API key (determines org/project) |
+| `POSTHOG_HOST` | No | us.i.posthog.com | API host (EU: eu.i.posthog.com) |
+| `POSTHOG_UI_HOST` | No | us.posthog.com | UI host for dashboard URLs |
 
 ## Files
 
-- `SKILL.md` - This guide
-- `dashboard_schema.json` - JSON schema for validation
-- `scripts/posthog_sync.sh` - Create/sync/export script
-- `examples/blog_dashboard.json` - Blog dashboard config
-- `examples/app_dashboard.json` - App dashboard config
+- `scripts/posthog_sync.sh` - CLI script (create/sync/update/export)
+- `examples/blog_dashboard.json` - Example config
 
 ## References
 
-- [PostHog API Docs](https://posthog.com/docs/api) - Full API reference
-- [Insights API](https://posthog.com/docs/api/insights) - Creating/querying insights
-- [Dashboards API](https://posthog.com/docs/api/dashboards) - Dashboard management
-- [Events API](https://posthog.com/docs/api/events) - Event querying
-- [HogQL](https://posthog.com/docs/hogql) - PostHog query language for advanced queries
+- [PostHog API Docs](https://posthog.com/docs/api)
+- [Personal API Keys](https://posthog.com/docs/api/overview#personal-api-keys)
