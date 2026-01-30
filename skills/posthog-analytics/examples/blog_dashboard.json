@@ -1,8 +1,12 @@
 {
   "name": "Blog Analytics",
   "description": "Track blog performance, reader engagement, and top content",
-  "domain_filter": "blog.sylph.ai",
-  "dashboard_id": null,
+  "domain_filter": "",
+  "filter": {
+    "key": "source",
+    "value": "blog"
+  },
+  "dashboard_id": 1166599,
   "insights": [
     {
       "name": "Blog Pageviews (Total)",
@@ -27,6 +31,20 @@
       "name": "Blog Traffic Trend",
       "type": "traffic_trend",
       "display": "ActionsLineGraph",
+      "date_range": "-30d"
+    },
+    {
+      "name": "Weekly Blog Readers",
+      "type": "unique_users",
+      "display": "BoldNumber",
+      "math": "weekly_active",
+      "date_range": "-30d"
+    },
+    {
+      "name": "Blog Traffic Sources",
+      "type": "top_pages",
+      "display": "ActionsTable",
+      "breakdown": "$referring_domain",
       "date_range": "-30d"
     }
   ]
