@@ -1,6 +1,6 @@
 ---
 name: clone-anywebsite
-description: Guide and recipe for high-fidelity, visual-first web cloning mainly using the Chrome DevTools MCP and Deep DOM Interrogation.
+description: Guide and recipe for high-fidelity, visual-first web cloning mainly using the Chrome DevTools MCP and Deep DOM Interrogation. and screenshot and read image tool
 author: SylphAI-Inc
 version: 1.0.0
 ---
