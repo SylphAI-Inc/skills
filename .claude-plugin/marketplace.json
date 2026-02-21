@@ -13,7 +13,11 @@
       "name": "core-skills",
       "description": "Essential skills for teams and developers building software with best engineering practices and 10x productivity",
       "source": "./",
-      "skills": ["./skills/create-skill", "./skills/posthog-analytics"]
+      "skills": [
+        "./skills/create-skill", 
+        "./skills/posthog-analytics", 
+        "./skills/clone-anywebsite"
+      ]
     }
   ]
 }
