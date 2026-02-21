@@ -33,7 +33,7 @@ Before writing code, establish a scalable folder structure. Modern landing pages
 
 1. **Capture:** Navigate to the target site and take a screenshot using an absolute path.
    `mcp_chrome-devtools_take_screenshot(filePath="/absolute/path/to/ref.png")`
-2. **Analyze:** Read the image (`LocalFileOps_read_image`) and actively identify the *Vibe*:
+2. **Analyze:** Read the image (using your read image tool) and actively identify the *Vibe*:
    - **Backgrounds:** Is it flat? A subtle radial gradient? Are there sweeping SVG waves or floating blurred orbs?
    - **Buttons:** Are they flat? Glassmorphic (backdrop-blur)? Do they have glowing auras?
    - **Typography:** Which specific words are highlighted? Are there gradient text clips?
@@ -236,7 +236,7 @@ When a WebGL Canvas shader is too heavily obfuscated to intercept (or relies on 
      4. `mcp_chrome-devtools_select_page(pageId=LOCAL_ID)` to explicitly focus your local clone.
      5. *(Optional but recommended)* Run `location.reload()` via script if WebGL or HMR is stuck.
      6. Take the local screenshot with an absolute path (`local_latest.png`).
-   - **Side-by-Side Stitching:** Use a quick Python script via `BashTool` to stitch them together horizontally for a flawless 1:1 visual comparison:
+   - **Side-by-Side Stitching:** Use a quick Python script via your shell tool to stitch them together horizontally for a flawless 1:1 visual comparison:
      ```bash
      python3 -c "
      from PIL import Image
@@ -251,7 +251,7 @@ When a WebGL Canvas shader is too heavily obfuscated to intercept (or relies on 
      dst.save('/absolute/path/combined.png')
      "
      ```
-   - **Read:** Use `LocalFileOps_read_image` on `combined.png` to spot any remaining visual discrepancies side-by-side.
+   - **Read:** Use your read image tool on `combined.png` to spot any remaining visual discrepancies side-by-side.
 
 ## Troubleshooting & Best Practices
 
