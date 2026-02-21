@@ -50,6 +50,7 @@ After installation, see all your available skills:
 |-------|-------------|
 | [create-skill](./skills/create-skill/SKILL.md) | Guide for creating AdaL skills - personal, project, or plugin |
 | [posthog-analytics](./skills/posthog-analytics/SKILL.md) | Automate PostHog dashboard creation, sync, and export via API |
+| [clone-anywebsite](./skills/clone-anywebsite/SKILL.md) | Guide and recipe for high-fidelity, visual-first web cloning |
 
 ## Creating Your Own Skills
 
@@ -59,13 +60,18 @@ See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on
 - **Plugin skills** (GitHub repo) - Public, shareable via marketplace
 ## Repository Structure
 
-```
-skills/
-├── marketplace.json       # Plugin metadata and skill registry
-├── README.md              # This file
-└── skills/                # All skills organized by name
-    └── <skill-name>/
-        └── SKILL.md       # Skill instructions (required)
+```text
+.
+├── .claude-plugin/
+│   └── marketplace.json       # Plugin metadata and skill registry (required path)
+├── README.md                  # This file
+└── skills/                    # All skills organized by name
+    ├── clone-anywebsite/
+    │   └── SKILL.md           # Skill instructions
+    ├── create-skill/
+    │   └── SKILL.md
+    └── posthog-analytics/
+        └── SKILL.md
 ```
 
 ## Contributing
