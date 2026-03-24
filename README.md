@@ -52,6 +52,28 @@ After installation, see all your available skills:
 | [posthog-analytics](./skills/posthog-analytics/SKILL.md) | Automate PostHog dashboard creation, sync, and export via API |
 | [clone-anywebsite](./skills/clone-anywebsite/SKILL.md) | Guide and recipe for high-fidelity, visual-first web cloning |
 
+### SWE CLI Skills (`swe-cli-skills` plugin)
+
+> **man pages for machines** 🤖 — Your agent knows the commands. We teach it the workflows.
+
+23 expert CLI guides across 9 categories. Senior engineer judgment — not reference docs, but operational workflows, safety guardrails, gotchas, error recovery, and anti-patterns.
+
+| Category | CLIs |
+|----------|------|
+| ☁️ Cloud | AWS, gcloud, Azure |
+| 🏗️ IaC | Terraform |
+| 🐳 Containers | Docker, kubectl, Helm |
+| 🔀 Git & VCS | Git, GitHub CLI |
+| 🛠️ Dev Tools | jq, sed, make |
+| 🌐 Networking | curl, SSH/SCP |
+| 📦 Package Managers | npm, pip/uv |
+| 🗄️ Databases | psql, redis-cli |
+| 🚀 Platforms | Stripe, Sentry, Vercel, Firebase, Fly.io |
+
+Install: `/plugin install swe-cli-skills@adal-agent-skills`
+
+See the full [swe-cli-skills README](./skills/swe-cli-skills/README.md) for details.
+
 ## Creating Your Own Skills
 
 See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on:
@@ -67,11 +89,23 @@ See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on
 ├── README.md                  # This file
 └── skills/                    # All skills organized by name
     ├── clone-anywebsite/
-    │   └── SKILL.md           # Skill instructions
+    │   └── SKILL.md
     ├── create-skill/
     │   └── SKILL.md
-    └── posthog-analytics/
-        └── SKILL.md
+    ├── posthog-analytics/
+    │   └── SKILL.md
+    └── swe-cli-skills/        # 23 CLI guides for AI coding agents
+        ├── SKILL.md            # Entry point (index + quick reference)
+        └── skills/
+            ├── cloud/          # AWS, gcloud, Azure
+            ├── iac/            # Terraform
+            ├── containers/     # Docker, kubectl, Helm
+            ├── git-vcs/        # Git, GitHub CLI
+            ├── dev-tools/      # jq, sed, make
+            ├── networking/     # curl, SSH
+            ├── package-managers/ # npm, pip/uv
+            ├── databases/      # psql, redis-cli
+            └── platforms/      # Stripe, Sentry, Vercel, Firebase, Fly.io
 ```
 
 ## Contributing

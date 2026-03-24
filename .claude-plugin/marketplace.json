@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Essential skills for teams and developers building software with best engineering practices and 10x productivity",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
@@ -14,9 +14,17 @@
       "description": "Essential skills for teams and developers building software with best engineering practices and 10x productivity",
       "source": "./",
       "skills": [
-        "./skills/create-skill", 
-        "./skills/posthog-analytics", 
+        "./skills/create-skill",
+        "./skills/posthog-analytics",
         "./skills/clone-anywebsite"
+      ]
+    },
+    {
+      "name": "swe-cli-skills",
+      "description": "man pages for machines — Senior engineer CLI expertise across 23 CLIs. Covers workflows, safety guardrails, gotchas, and anti-patterns for cloud, IaC, containers, databases, dev tools & platforms.",
+      "source": "./",
+      "skills": [
+        "./skills/swe-cli-skills"
       ]
     }
   ]
