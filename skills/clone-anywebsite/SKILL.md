@@ -175,6 +175,67 @@ javascript_tool(tab_id=1, action="javascript_exec", text="
 | CSS animations only, no libraries | **Pure CSS** | Extract `@keyframes` and `animation` properties |
 | Nothing detected but things move | **Scroll-driven CSS** or **IntersectionObserver** | Check for `scroll-timeline`, `animation-timeline`, or custom JS observers |
 
+#### Step 4b: Video Recording & Analysis (Understand Effects)
+
+The scanner tells you *what* tech powers the animation, but not *what it looks like in motion*. Animations are invisible to static CSS extraction. Use the browser-use agent's built-in **screen recording** capability to capture and analyze entrance animations, hover effects, and continuous motion.
+
+**Record the entrance animation:**
+```
+// Start recording before navigating to trigger entrance animations
+computer(tab_id=1, action="start_recording")
+navigate("https://target-site.com/")  // hard-refresh triggers entrance anim
+
+// Rapid screenshot burst — 10-12 frames over ~6 seconds
+computer(tab_id=1, action="wait", duration=0.3)
+computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="wait", duration=0.5)
+computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="wait", duration=0.5)
+computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="wait", duration=1.0)
+computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="wait", duration=1.0)
+computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="wait", duration=1.5)
+computer(tab_id=1, action="screenshot")
+
+computer(tab_id=1, action="stop_recording")
+computer(tab_id=1, action="export_recording", filename="entrance-animation.gif")
+```
+
+**Analyze the frames** — for each screenshot, identify:
+- Which elements are visible/invisible
+- Animation type per element (fade, slide-up, scale, blur-to-sharp)
+- Approximate timing and stagger order
+- Continuous vs one-shot animations
+
+**Common Framer hero animation patterns** (discovered from real clone sessions):
+
+| Element | Animation | Timing | Framer Motion |
+|---------|-----------|--------|---------------|
+| Glow/orb | Appears first, continuous morph/rotation | 0s (always visible) | CSS `@keyframes` or `animate={{ rotate: 360 }}` with `repeat: Infinity` |
+| Navbar | Slide down + fade in | ~0.1-0.3s | `initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}` |
+| Badge ("New") | Fade + scale in | ~0.3-0.5s | `initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}` |
+| H1 heading | Fade in + slide up | ~0.4-0.6s | `initial={{ y: 30, opacity: 0 }} animate={{ y: 0, opacity: 1 }}` |
+| Description | Fade in + slide up | ~0.5-0.7s | Same pattern, staggered |
+| CTA buttons | Fade in + slide up | ~0.6-0.8s | Same pattern, staggered |
+| Stars/particles | Fade in | ~0.2-0.5s | `initial={{ opacity: 0 }} animate={{ opacity: 0.5 }}` |
+
+**Key insight:** Most Framer hero animations use a simple **staggered fade-up** pattern. The glow/orb is the only continuously animated element. The recording confirms the exact stagger order and timing.
+
+**For hover/interaction effects** — record while performing the interaction:
+```
+computer(tab_id=1, action="start_recording")
+// Screenshot the resting state
+computer(tab_id=1, action="screenshot")
+// Hover over the button
+computer(tab_id=1, action="click", selector="button.get-started")
+computer(tab_id=1, action="wait", duration=0.5)
+computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="stop_recording")
+computer(tab_id=1, action="export_recording", filename="hover-effect.gif")
+```
+
 #### Step 5: Asset Extraction (SVGs, Logos, Videos)
 
 - **Inline SVG:** Extract `outerHTML` via `javascript_tool`, then save with `bash`
@@ -657,6 +718,34 @@ Clone the hero section of [TARGET_URL].
 ## Mandatory: Two-Agent Builder+Evaluator Pattern
 
 **The builder MUST NOT evaluate its own output.** Always use **two separate browser-use workers** orchestrated by the AdaL Engineer supervisor. This is not optional — a single agent that both builds and judges its own clone produces measurably worse results.
+
+### Recommended Models (Cost-Effective + Visual + Coding)
+
+Cloning is token-intensive (screenshots, DOM extraction, many fix rounds). Use cost-effective models that support **vision** (for screenshot comparison) and **coding** (for React/Tailwind):
+
+| Model | Input $/M | Output $/M | Vision | Why |
+|-------|-----------|------------|--------|-----|
+| **MiniMax M3** (recommended) | $0.30 | $1.20 | ✅ | Cheapest, strong coding, multimodal — best value for token-heavy clone sessions |
+| Muse Spark 1.1 | $1.25 | $4.25 | ✅ | Good agentic coding, always-on reasoning — solid alternative |
+| Grok 4.5 | $2.00 | $6.00 | ✅ | Strongest reasoning, but 4-5× the cost of MiniMax M3 |
+
+**Default recommendation:** Use `minimax-MiniMax-M3` for both Builder and Evaluator workers. If you need stronger reasoning for a complex clone, use `grok-4.5` for the Evaluator only (it's the adversarial judge — reasoning quality matters most there).
+
+```
+# Builder — cost-effective, good at coding + vision
+adal_worker_start(
+  work_dir="/path/to/project",
+  command=["adal", "--yolo", "--model", "minimax-MiniMax-M3", "--agent-mode", "browser-use"],
+  launch_mode="attach", alias="builder"
+)
+
+# Evaluator — adversarial judge, can upgrade to grok-4.5 for harder cases
+adal_worker_start(
+  work_dir="/path/to/project",
+  command=["adal", "--yolo", "--model", "minimax-MiniMax-M3", "--agent-mode", "browser-use"],
+  launch_mode="attach", alias="evaluator"
+)
+```
 
 ### Worker 1 — Builder (Browser-Use)
 One agent does the full visual loop: navigate target, screenshot matrix, extract CSS/fonts/assets, run animation scanner, scaffold and build the clone.
