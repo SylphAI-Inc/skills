@@ -175,39 +175,94 @@ javascript_tool(tab_id=1, action="javascript_exec", text="
 | CSS animations only, no libraries | **Pure CSS** | Extract `@keyframes` and `animation` properties |
 | Nothing detected but things move | **Scroll-driven CSS** or **IntersectionObserver** | Check for `scroll-timeline`, `animation-timeline`, or custom JS observers |
 
-#### Step 4b: Video Recording & Analysis (Understand Effects)
+#### Step 4b: GIF Recording & Analysis (Understand Effects)
 
-The scanner tells you *what* tech powers the animation, but not *what it looks like in motion*. Animations are invisible to static CSS extraction. Use the browser-use agent's built-in **screen recording** capability to capture and analyze entrance animations, hover effects, and continuous motion.
+The scanner tells you *what* tech powers the animation, but not *what it looks like in motion*. Animations are invisible to static CSS extraction. Use the browser-use agent's `gif_creator` tool to capture entrance animations, hover effects, and continuous motion as animated GIFs, then analyze the frames.
+
+**How `gif_creator` works:** It records screenshots automatically on every `computer` action (click, scroll, screenshot, wait) and `navigate` call while recording is active. Max 50 frames per recording. Export produces an animated GIF with optional overlays (click indicators, action labels, progress bar, watermark). Use `download: true` to save to disk, or `coordinate: [x, y]` to drag-drop onto a page.
 
 **Record the entrance animation:**
 ```
-// Start recording before navigating to trigger entrance animations
-computer(tab_id=1, action="start_recording")
-navigate("https://target-site.com/")  // hard-refresh triggers entrance anim
+// 1. Start recording — clears any previous frames
+gif_creator(tab_id=1, action="start_recording")
 
-// Rapid screenshot burst — 10-12 frames over ~6 seconds
+// 2. Navigate to trigger entrance animations (this captures the first frame)
+navigate(tab_id=1, url="https://target-site.com/")
+
+// 3. Capture frames at intervals to record the animation progression
+//    Each screenshot call captures a frame automatically
 computer(tab_id=1, action="wait", duration=0.3)
-computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="screenshot")   // frame: early entrance
 computer(tab_id=1, action="wait", duration=0.5)
-computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="screenshot")   // frame: mid-animation
 computer(tab_id=1, action="wait", duration=0.5)
-computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="screenshot")   // frame: near-settled
 computer(tab_id=1, action="wait", duration=1.0)
-computer(tab_id=1, action="screenshot")
-computer(tab_id=1, action="wait", duration=1.0)
-computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="screenshot")   // frame: settled
 computer(tab_id=1, action="wait", duration=1.5)
-computer(tab_id=1, action="screenshot")
+computer(tab_id=1, action="screenshot")   // frame: final resting state
 
-computer(tab_id=1, action="stop_recording")
-computer(tab_id=1, action="export_recording", filename="entrance-animation.gif")
+// 4. Stop recording (keeps frames for export)
+gif_creator(tab_id=1, action="stop_recording")
+
+// 5. Export as GIF — download to disk for analysis
+gif_creator(
+  tab_id=1,
+  action="export",
+  download=true,
+  filename="entrance-animation.gif",
+  options={showClickIndicators: false, showActionLabels: false, showProgressBar: true, quality: 5}
+)
 ```
 
-**Analyze the frames** — for each screenshot, identify:
-- Which elements are visible/invisible
+**Analyze the GIF** — the exported GIF is saved to the browser screenshot directory (default: `/tmp/adal_browser/`). Read it with your image tool and identify:
+- Which elements appear/disappear across frames
 - Animation type per element (fade, slide-up, scale, blur-to-sharp)
-- Approximate timing and stagger order
-- Continuous vs one-shot animations
+- Approximate timing and stagger order (frame timestamps are embedded)
+- Continuous vs one-shot animations (does the glow keep rotating after everything settles?)
+
+**Record hover/interaction effects:**
+```
+// 1. Start recording
+gif_creator(tab_id=1, action="start_recording")
+
+// 2. Capture resting state
+computer(tab_id=1, action="screenshot")
+
+// 3. Hover over the button to trigger the hover animation
+computer(tab_id=1, action="hover", coordinate=[500, 400])
+computer(tab_id=1, action="wait", duration=0.5)
+computer(tab_id=1, action="screenshot")   // frame: hover state
+
+// 4. Move away to capture the transition back
+computer(tab_id=1, action="hover", coordinate=[10, 10])
+computer(tab_id=1, action="wait", duration=0.3)
+computer(tab_id=1, action="screenshot")   // frame: resting state restored
+
+// 5. Stop and export
+gif_creator(tab_id=1, action="stop_recording")
+gif_creator(
+  tab_id=1,
+  action="export",
+  download=true,
+  filename="hover-effect.gif",
+  options={showClickIndicators: true, showActionLabels: true, quality: 5}
+)
+```
+
+**Record scroll-triggered animations:**
+```
+gif_creator(tab_id=1, action="start_recording")
+computer(tab_id=1, action="screenshot")                          // frame: top of page
+computer(tab_id=1, action="scroll", coordinate=[720, 400], scroll_direction="down", scroll_amount=3)
+computer(tab_id=1, action="wait", duration=1.0)
+computer(tab_id=1, action="screenshot")                          // frame: mid-scroll reveal
+computer(tab_id=1, action="scroll", coordinate=[720, 400], scroll_direction="down", scroll_amount=3)
+computer(tab_id=1, action="wait", duration=1.0)
+computer(tab_id=1, action="screenshot")                          // frame: further down
+gif_creator(tab_id=1, action="stop_recording")
+gif_creator(tab_id=1, action="export", download=true, filename="scroll-animations.gif", options={quality: 5})
+```
 
 **Common Framer hero animation patterns** (discovered from real clone sessions):
 
@@ -221,20 +276,14 @@ computer(tab_id=1, action="export_recording", filename="entrance-animation.gif")
 | CTA buttons | Fade in + slide up | ~0.6-0.8s | Same pattern, staggered |
 | Stars/particles | Fade in | ~0.2-0.5s | `initial={{ opacity: 0 }} animate={{ opacity: 0.5 }}` |
 
-**Key insight:** Most Framer hero animations use a simple **staggered fade-up** pattern. The glow/orb is the only continuously animated element. The recording confirms the exact stagger order and timing.
+**Key insight:** Most Framer hero animations use a simple **staggered fade-up** pattern. The glow/orb is the only continuously animated element. The GIF recording confirms the exact stagger order and timing.
 
-**For hover/interaction effects** — record while performing the interaction:
-```
-computer(tab_id=1, action="start_recording")
-// Screenshot the resting state
-computer(tab_id=1, action="screenshot")
-// Hover over the button
-computer(tab_id=1, action="click", selector="button.get-started")
-computer(tab_id=1, action="wait", duration=0.5)
-computer(tab_id=1, action="screenshot")
-computer(tab_id=1, action="stop_recording")
-computer(tab_id=1, action="export_recording", filename="hover-effect.gif")
-```
+**GIF tips:**
+- Max 50 frames per recording — plan your capture sequence to stay under the limit
+- Use `quality: 5` for higher-quality GIFs during analysis (lower number = better quality)
+- Disable overlays (`showClickIndicators: false`, `showActionLabels: false`) for clean visual analysis
+- Enable overlays (`showClickIndicators: true`) when recording for documentation or sharing
+- Use `gif_creator(tab_id=1, action="clear")` to discard frames if you need to re-record
 
 #### Step 5: Asset Extraction (SVGs, Logos, Videos)
 
