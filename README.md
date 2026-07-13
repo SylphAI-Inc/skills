@@ -50,7 +50,7 @@ After installation, see all your available skills:
 |-------|-------------|
 | [create-skill](./skills/create-skill/SKILL.md) | Guide for creating AdaL skills - personal, project, or plugin |
 | [posthog-analytics](./skills/posthog-analytics/SKILL.md) | Automate PostHog dashboard creation, sync, and export via API |
-| [clone-anywebsite](./skills/clone-anywebsite/SKILL.md) | Guide and recipe for high-fidelity, visual-first web cloning |
+| [clone-anywebsite](./skills/clone-anywebsite/SKILL.md) | Clone any website's landing page with pixel-perfect fidelity — visual-first workflow with sniper CSS extraction, animation detection, and mandatory Builder+Evaluator pattern |
 
 ### SWE CLI Skills (`swe-cli-skills` plugin)
 
