@@ -16,7 +16,8 @@
       "skills": [
         "./skills/create-skill",
         "./skills/posthog-analytics",
-        "./skills/clone-anywebsite"
+        "./skills/clone-anywebsite",
+        "./skills/glowmotion"
       ]
     },
     {
