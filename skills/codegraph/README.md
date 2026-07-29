@@ -44,6 +44,68 @@ use.
 
 ---
 
+## The three views
+
+What you get is a single HTML file carrying three linked views of the same
+scan, cycled with `Tab`. Clicking a module box or a galaxy drills into explore,
+focused on that module's files.
+
+| View | Answers | What it is |
+|---|---|---|
+| **overview** | *"what are the parts?"* | Architecture diagram — module boxes on layer bands, flowing connectors, a comet on the primary dependency path. Derived from the scan, never authored, so it cannot drift from the real code. |
+| **star map** | *"where is the weight of this system?"* | The same modules as an orbitable galaxy field, brightness = importance. Drag to orbit, scroll to dolly, shift-drag to pan, `0` to reset. A projected 2.5D disc in Canvas — no three.js, no WebGL. |
+| **explore** | *"how do the pieces connect?"* | An expandable tree opened one level at a time: folders → files → symbols. A `+N` badge on every collapsed node says how much is inside, so nothing is hidden silently. |
+
+![codegraph star map — AdalFlow](./assets/codegraph-adalflow-starmap.png)
+
+<sub>The star map on the same AdalFlow scan — every module a galaxy, brightness
+and cluster size tracking importance. `core` and `components/model_client` sit at
+the centre of the dependency web; `optim` and `tracing` form their own arms.</sub>
+
+### Every node says something, with zero model calls
+
+`scan.py` reads the codebase's **own docstrings and file-header comments** —
+module docstrings, JSDoc blocks, Go/Rust line comments — and uses them as node
+summaries. Boilerplate is filtered and text is cut at `Args:`/`Returns:` so the
+summary stays one sentence.
+
+Measured on a real 109k-LOC repo: **87% of files described with zero model
+calls.** The agent's `enrich.json` overrides these where it can say something
+better, and the inspector labels which is which — an extracted summary is
+marked *from the file's docstring*, so provenance is never ambiguous.
+
+This matters because a graph of unlabelled dots teaches nothing.
+
+### Keeping a dense repo readable
+
+Real repos produce hairballs, so explore **starts simplified** and lets the
+reader add detail back: tests hidden, hub-file edges folded to a `⋯n` badge,
+`calls` edges off (they outnumber imports ~5:1), distance LOD, and a
+neighbourhood focus mode.
+
+Measured on a 109k-LOC repo: **628 → 172 edges (−73%)** at defaults, **−87%**
+in focus mode.
+
+**Why not 3D?** The clutter is edge *count*, not a missing dimension. 3D adds
+occlusion, rotation disorientation, and a ~600KB three.js dependency that breaks
+the single-file offline contract. LOD plus folding solves the actual problem.
+
+---
+
+## Examples in the wild
+
+| Demo | Repo scanned | What it exercises |
+|---|---|---|
+| [▶ 40s walkthrough on YouTube](https://youtu.be/0jmKh3dBnIA) | [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow) — the LLM task-pipeline framework | 466 files, 103,010 LOC, Python. All three views, 3 guided tours, layer bands, the inspector with metrics + `DEFINES` + `DEPENDS ON`, live theme toggle |
+
+AdalFlow is a useful reference scan because it is a genuinely layered Python
+codebase — `core/` primitives under `components/` clients and retrievers, with
+`optim/`, `tracing/`, benchmarks, and tutorials on top. The walkthrough opens on
+the overview, orbits the star map, then drills into `core/component.py` with a
+tour running, which is the shape most onboarding sessions take.
+
+---
+
 ## Why it exists
 
 Onboarding onto an unfamiliar repo is mostly archaeology: grep, follow an
@@ -103,67 +165,6 @@ never pretends to be reproducible.
 `graph.json` is machine output and is never hand-written; the agent only ever
 writes `enrich.json`. Because the two are separate files, **existing summaries
 survive a re-scan** — only ids that no longer exist get dropped.
-
----
-
-## The three views
-
-Cycled with `Tab`. Clicking a module box or a galaxy drills into explore,
-focused on that module's files.
-
-| View | Answers | What it is |
-|---|---|---|
-| **overview** | *"what are the parts?"* | Architecture diagram — module boxes on layer bands, flowing connectors, a comet on the primary dependency path. Derived from the scan, never authored, so it cannot drift from the real code. |
-| **star map** | *"where is the weight of this system?"* | The same modules as an orbitable galaxy field, brightness = importance. Drag to orbit, scroll to dolly, shift-drag to pan, `0` to reset. A projected 2.5D disc in Canvas — no three.js, no WebGL. |
-| **explore** | *"how do the pieces connect?"* | An expandable tree opened one level at a time: folders → files → symbols. A `+N` badge on every collapsed node says how much is inside, so nothing is hidden silently. |
-
-![codegraph star map — AdalFlow](./assets/codegraph-adalflow-starmap.png)
-
-<sub>The star map on the same AdalFlow scan — every module a galaxy, brightness
-and cluster size tracking importance. `core` and `components/model_client` sit at
-the centre of the dependency web; `optim` and `tracing` form their own arms.</sub>
-
-### Every node says something, with zero model calls
-
-`scan.py` reads the codebase's **own docstrings and file-header comments** —
-module docstrings, JSDoc blocks, Go/Rust line comments — and uses them as node
-summaries. Boilerplate is filtered and text is cut at `Args:`/`Returns:` so the
-summary stays one sentence.
-
-Measured on a real 109k-LOC repo: **87% of files described with zero model
-calls.** The agent's `enrich.json` overrides these where it can say something
-better, and the inspector labels which is which — an extracted summary is
-marked *from the file's docstring*, so provenance is never ambiguous.
-
-This matters because a graph of unlabelled dots teaches nothing.
-
-### Keeping a dense repo readable
-
-Real repos produce hairballs, so explore **starts simplified** and lets the
-reader add detail back: tests hidden, hub-file edges folded to a `⋯n` badge,
-`calls` edges off (they outnumber imports ~5:1), distance LOD, and a
-neighbourhood focus mode.
-
-Measured on a 109k-LOC repo: **628 → 172 edges (−73%)** at defaults, **−87%**
-in focus mode.
-
-**Why not 3D?** The clutter is edge *count*, not a missing dimension. 3D adds
-occlusion, rotation disorientation, and a ~600KB three.js dependency that breaks
-the single-file offline contract. LOD plus folding solves the actual problem.
-
----
-
-## Examples in the wild
-
-| Demo | Repo scanned | What it exercises |
-|---|---|---|
-| [▶ 40s walkthrough on YouTube](https://youtu.be/0jmKh3dBnIA) | [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow) — the LLM task-pipeline framework | 466 files, 103,010 LOC, Python. All three views, 3 guided tours, layer bands, the inspector with metrics + `DEFINES` + `DEPENDS ON`, live theme toggle |
-
-AdalFlow is a useful reference scan because it is a genuinely layered Python
-codebase — `core/` primitives under `components/` clients and retrievers, with
-`optim/`, `tracing/`, benchmarks, and tutorials on top. The walkthrough opens on
-the overview, orbits the star map, then drills into `core/component.py` with a
-tour running, which is the shape most onboarding sessions take.
 
 ---
 
