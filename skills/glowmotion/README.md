@@ -74,11 +74,16 @@ Then just ask, in natural language:
 > "Draw me an animated architecture diagram of this repo's request path, neon theme."
 
 The skill triggers on its own — you never invoke the scripts by hand in normal
-use. Everything below is for people who want to understand or extend the engine.
+use.
 
 ---
 
 ## How it works
+
+You author a semantic graph; the engine computes every coordinate, renders the
+file, and a mechanized checker verifies the result before it ships. The full
+authoring contract lives in
+[`references/graph-format.md`](./references/graph-format.md).
 
 ```
   your graph.json  ──▶  layout.py --render  ──▶  diagram.html
@@ -93,83 +98,6 @@ use. Everything below is for people who want to understand or extend the engine.
                                 ▼
                         0 violations → ship
 ```
-
-### 1. Author the graph
-
-A semantic graph, written to a **temp path** (it is a throwaway intermediate,
-not a deliverable):
-
-```json
-{
-  "mode": "architecture",
-  "darkTheme": "midnight",
-  "title": "Request path",
-  "titleHighlight": "end to end",
-  "subtitle": "Edge cache absorbs reads; writes fan out through the bus.",
-  "nodes": [
-    {"id": "web",   "label": "Web client",  "type": "frontend"},
-    {"id": "api",   "label": "API gateway", "type": "backend"},
-    {"id": "cache", "label": "Redis",       "type": "database", "sublabel": "read-through"},
-    {"id": "db",    "label": "Postgres",    "type": "database"}
-  ],
-  "edges": [
-    {"from": "web",   "to": "api",   "kind": "main", "label": "HTTPS"},
-    {"from": "api",   "to": "cache", "kind": "sync"},
-    {"from": "cache", "to": "db",    "kind": "async", "label": "miss"}
-  ],
-  "journeys": [
-    {"hops": [["web", "api"], ["api", "cache"], ["cache", "db"]]}
-  ],
-  "summary": [
-    {"accent": "cyan",   "title": "Ingress",  "items": ["TLS terminates at the edge"]},
-    {"accent": "violet", "title": "Cache",    "items": ["Read-through, 60s TTL"]},
-    {"accent": "rose",   "title": "Storage",  "items": ["Primary + async replica"]}
-  ]
-}
-```
-
-**Journeys are the point.** Each one becomes a glowing dot with two fading
-trail dots riding the exact connector path, and every node it touches gets a
-pulsing halo on a staggered delay. A diagram with zero journeys fails the
-checker — the animation is the deliverable, not decoration.
-
-### 2. Render
-
-```bash
-python3 scripts/layout.py graph.json --render request-path.html
-```
-
-That single command emits the complete deliverable: every coordinate and path,
-both theme palettes plus the ☀/☾ toggle, the glow/trail/halo animation layer,
-icons, legend, summary cards, the ⏯ pause button, reduced-motion handling, and
-ARIA wiring.
-
-Omit `--render` and it prints the computed geometry as JSON instead — useful for
-inspecting layout decisions.
-
-### 3. Verify (non-negotiable)
-
-```bash
-python3 scripts/check_diagram.py request-path.html
-```
-
-It must print `0 violations`. Never verify by eyeballing the code or opening a
-browser — label drift and geometry errors are invisible to the eye.
-
-| Checker | Catches |
-|---|---|
-| `check_diagram.py` | partial overlaps (C1), connectors through boxes (C2), dash-loop seams (C3), out-of-viewBox (C4), dots off their line (C5), black-fill paths (C6), endpoint pierce (C7), dangling SMIL refs (C8), foreign node inside a group (C9), missing/overstuffed animation layer (C10) |
-| `check_fidelity.py` | Mermaid input only: node/edge/label drift vs. the source `.mmd` |
-
-For Mermaid input, also run the fidelity check until it reports `PASS`:
-
-```bash
-python3 scripts/check_fidelity.py source.mmd request-path.html
-```
-
-Fix violations by editing the JSON and re-rendering — cheap and deterministic.
-For a colliding label: shorten it, move it to a different edge, fold it into the
-node as a `sublabel`, or drop it when the edge reads fine without one.
 
 ---
 
