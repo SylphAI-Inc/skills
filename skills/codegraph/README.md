@@ -11,12 +11,13 @@ orbitable **star map**, and an expandable **explore** tree.
 No build step, no CDN, no API key in the artifact. **Requires `python3` 3.8+**
 (pure stdlib). ~2s for 230k LOC.
 
-![codegraph explore view — AdalFlow](./assets/codegraph-adalflow-overview.png)
+![codegraph overview diagram — AdalFlow](./assets/codegraph-adalflow-overview.png)
 
 <sub>codegraph run against [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow) —
-466 files, 103,010 LOC. Explore view with a guided tour running, the inspector
-open on `core/component.py`, and layer bands down the left rail.
-**[▶ Watch the 40s walkthrough](./assets/codegraph-adalflow-demo.mp4)**</sub>
+466 files, 103,010 LOC. The overview view: module boxes on layer bands
+(`ENTRY` → `UI · LOGIC` → `SHARED · INFRA` → `OTHER`), file/LOC counts per box,
+and the primary dependency path traced in blue.
+**[▶ Watch the 40s walkthrough on YouTube](https://youtu.be/0jmKh3dBnIA)**</sub>
 
 > This README is the human-facing overview. The agent-facing instructions live
 > in [`SKILL.md`](./SKILL.md) — read that before running anything.
@@ -116,11 +117,11 @@ focused on that module's files.
 | **star map** | *"where is the weight of this system?"* | The same modules as an orbitable galaxy field, brightness = importance. Drag to orbit, scroll to dolly, shift-drag to pan, `0` to reset. A projected 2.5D disc in Canvas — no three.js, no WebGL. |
 | **explore** | *"how do the pieces connect?"* | An expandable tree opened one level at a time: folders → files → symbols. A `+N` badge on every collapsed node says how much is inside, so nothing is hidden silently. |
 
-![codegraph architecture overview — AdalFlow](./assets/codegraph-adalflow-architecture.png)
+![codegraph star map — AdalFlow](./assets/codegraph-adalflow-starmap.png)
 
-<sub>The overview view on the same AdalFlow scan — module boxes on layer bands
-(`UI LOGIC`, `SHARED INFRA`, `OTHER`), with the detected stack and a search box
-in the header.</sub>
+<sub>The star map on the same AdalFlow scan — every module a galaxy, brightness
+and cluster size tracking importance. `core` and `components/model_client` sit at
+the centre of the dependency web; `optim` and `tracing` form their own arms.</sub>
 
 ### Every node says something, with zero model calls
 
@@ -156,7 +157,7 @@ the single-file offline contract. LOD plus folding solves the actual problem.
 
 | Demo | Repo scanned | What it exercises |
 |---|---|---|
-| [▶ `codegraph-adalflow-demo.mp4`](./assets/codegraph-adalflow-demo.mp4) (40s) | [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow) — the LLM task-pipeline framework | 466 files, 103,010 LOC, Python. All three views, 3 guided tours, layer bands, the inspector with metrics + `DEFINES` + `DEPENDS ON`, live theme toggle |
+| [▶ 40s walkthrough on YouTube](https://youtu.be/0jmKh3dBnIA) | [AdalFlow](https://github.com/SylphAI-Inc/AdalFlow) — the LLM task-pipeline framework | 466 files, 103,010 LOC, Python. All three views, 3 guided tours, layer bands, the inspector with metrics + `DEFINES` + `DEPENDS ON`, live theme toggle |
 
 AdalFlow is a useful reference scan because it is a genuinely layered Python
 codebase — `core/` primitives under `components/` clients and retrievers, with
@@ -233,9 +234,8 @@ codegraph/
 ├── SKILL.md                       # agent instructions (the entry point)
 ├── README.md                      # this file
 ├── assets/                        # sample output shown in this README
-│   ├── codegraph-adalflow-demo.mp4
 │   ├── codegraph-adalflow-overview.png
-│   └── codegraph-adalflow-architecture.png
+│   └── codegraph-adalflow-starmap.png
 └── scripts/
     ├── scan.py                    # stage 1 — deterministic structural scan
     ├── overview.py                # collapses the graph into the overview diagram
