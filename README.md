@@ -1,50 +1,75 @@
-# AdaL Skills Marketplace
+# AdaL Skills
 
-Essential skills for teams and developers building software with best engineering practices and 10x productivity. Compatible with [AdaL CLI](https://sylph.ai) and Claude Code.
+Essential skills for teams and developers building software with best engineering practices. One `SKILL.md` folder per skill — usable by [AdaL CLI](https://sylph.ai), Claude Code, and any agent that speaks the [`@skills:` protocol](https://github.com/SylphAI-Inc/atskills).
 
-## Installation
+**It's just a file tree.** No manifest to maintain, no `marketplace.json` to register with, no bundle or plugin concepts to learn. A folder holding a `SKILL.md` is a skill; its path is its address; the tree is the marketplace.
 
-> **Both AdaL CLI and Claude Code use the same commands.**
+## Use a skill — nothing to install
 
-### Step 1: Add the Marketplace
-
-```
-/plugin marketplace add SylphAI-Inc/skills
-```
-
-### Step 2: Browse and Install
-
-Use the `/plugin` command to browse available plugins and install:
+Every path in this repo is an address. Reference it and it loads, right now:
 
 ```
-/plugin
+@skills:gh:sylphai-inc/skills/skills/posthog-analytics   set up our dashboards
 ```
 
-Then follow the interactive dialog:
-1. Select **Browse and install plugins**
-2. Select **adal-agent-skills** marketplace
-3. Select **core-skills** plugin
-4. Select **Install now**
+That's the whole integration. Reading is using; nothing is installed, nothing stays resident.
 
-Or install directly:
+**And `@` comes with the user experience you already have.** Typing `@` autocompletes skills in the same dropdown you already use for files and directories: the project's own skills and every followed cloud ID complete instantly, each suggestion showing where it lives. A skill you've used is one keystroke away; a skill you've never seen is one pasted path away (GitHub URLs work as-is). The flexibility of addressing anything by path, with the muscle memory of `@`-mentioning a file — no new gesture to learn.
+
+## Highlight 1 — skills managed like a filesystem
+
+**A path addresses any granularity: one skill, a collection, or the whole tree.** `@skills:` references, saves, and auto-trigger lines all respect the same GitHub path relations:
 
 ```
-/plugin install core-skills@adal-agent-skills
+@skills:gh:sylphai-inc/skills                          the whole repo -> a menu
+@skills:gh:sylphai-inc/skills/skills                   the collection -> a menu
+@skills:gh:sylphai-inc/skills/skills/create-skill      one skill -> its body
+@skills:gh:sylphai-inc/skills/skills/create-skill:save vendor it, adapt it, own it
 ```
 
-> **Format:** `/plugin install <plugin-name>@<marketplace-name>`
+A directory is a **menu** — one line per skill, every line itself a valid address — so browsing and using are the same gesture. Take the tree piece by piece: load one subtree now, a sibling later, and the validating cache means nothing is ever downloaded twice — each use asks "did this change?" and unchanged content serves instantly. Saves vendor at the ID's own path (`.atskills/gh/sylphai-inc/skills/...`), so copies from one source nest together and every saved copy answers its own address, exactly like Go's `vendor/` directory.
 
-### Step 3: View Available Skills
+Manage skills the way you manage files: by path, at whatever granularity the moment needs. There is no bundle format because none is needed — a "bundle" is just a directory, and you take skills from it one path at a time.
 
-After installation, see all your available skills:
+## Highlight 2 — one config file, `.gitignore` semantics
+
+**Everything that fires on its own is one readable file**: `.atskills/.autotrigger`, one line per entry, exactly like `.gitignore` — and with the same flexibility about which parts are on:
+
+```
+# .atskills/.autotrigger
+sec-checklist                              your skill — auto-triggers
+team-flows/                                every skill under the directory
+!team-flows/experimental                   ...except that one
+@gh:sylphai-inc/skills/skills/create-skill follow this repo's latest
+@gh:sylphai-inc/skills/skills/             follow the whole collection
+```
+
+Install = add a line. Uninstall = remove it. A directory line covers present *and future* skills under it; a `!` negation carves out exceptions; an `@` line follows upstream so the provider keeps it current. One `git diff` line per decision, reviewed like any other change — no manifest, no lockfile, no per-machine state.
+
+## Highlight 3 — `/skills`: one surface manages it all
+
+You never have to touch a dotfile. `/skills` is a checkbox tree over `.autotrigger` and `.atskills/` — every kind of line (your local skills, `gh:` GitHub follows, hub follows) and every kind of storage (your own folders, saved copies with their `.source` provenance) in one view:
 
 ```
 /skills
+  [~] team-flows/              a directory line, partially on
+      [x] deploy
+      [ ] review
+  [x] my-tdd                   yours
+  [x] @gh:sylphai-inc/skills/skills/create-skill   cloud · auto-updates
+```
+
+Check a box → a line is written. Uncheck under a covering directory → the line **splits** so the file always reads true. `a` adds any skill by ID (pasted GitHub URLs work), `x` removes a saved folder and its line, and *view prompt* shows the exact text the model sees, word for word, with its token count. Every checkbox action is equally a typed command (`/skills install|uninstall|toggle|save|remove <path>`) and equally a hand edit — three ways to write the same one-line diffs.
+
+## Try it
+
+```
+@skills:gh:sylphai-inc/skills/skills      # browse this repo's collection
+/skills                                   # manage: checkbox tree over .autotrigger
+/skills install gh:sylphai-inc/skills/skills/posthog-analytics
 ```
 
 ## Available Skills
-
-### Core Skills (`core-skills` plugin)
 
 | Skill | Description |
 |-------|-------------|
@@ -76,20 +101,31 @@ Install: `/plugin install swe-cli-skills@adal-agent-skills`
 
 See the full [swe-cli-skills README](./skills/swe-cli-skills/README.md) for details.
 
+## Classic plugin install (compatible)
+
+The marketplace/plugin path keeps working unchanged, in both AdaL CLI and Claude Code:
+
+```
+/plugin marketplace add SylphAI-Inc/skills
+/plugin install core-skills@adal-agent-skills
+/skills
+```
+
 ## Creating Your Own Skills
 
 See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on:
 - **Personal skills** (`~/.adal/skills/`) - Private to you
-- **Project skills** (`.adal/skills/`) - Shared via git with your team
-- **Plugin skills** (GitHub repo) - Public, shareable via marketplace
+- **Project skills** (`.atskills/` or `.adal/skills/`) - Shared via git with your team
+- **Public skills** (GitHub repo) - Shareable by path, no packaging required
+
 ## Repository Structure
 
 ```text
 .
 ├── .claude-plugin/
-│   └── marketplace.json       # Plugin metadata and skill registry (required path)
+│   └── marketplace.json       # Plugin metadata (classic install path only)
 ├── README.md                  # This file
-└── skills/                    # All skills organized by name
+└── skills/                    # All skills organized by name — every folder an address
     ├── clone-anywebsite/
     │   └── SKILL.md
     ├── codegraph/              # Interactive codebase graph generator
@@ -121,8 +157,8 @@ See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on
 
 1. Fork this repository
 2. Create a new skill in `skills/<skill-name>/SKILL.md`
-3. Add the skill to `marketplace.json` under the appropriate plugin
-4. Submit a pull request
+3. (Classic path only) add it to `marketplace.json`
+4. Submit a pull request — merged skills are instantly addressable as `gh:sylphai-inc/skills/skills/<name>`
 
 ### SKILL.md Format
 
