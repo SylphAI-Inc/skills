@@ -1,4 +1,4 @@
 mediapipe>=0.10.14
 opencv-python>=4.9
 numpy>=1.26
-google-genai>=1.0
+google-genai>=2.3.0

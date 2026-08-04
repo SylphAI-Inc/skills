@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import subprocess
 import tempfile
+import types
 import unittest
 from unittest import mock
 
@@ -40,6 +41,72 @@ class ProcessTests(unittest.TestCase):
             side_effect=lambda command: None if command == "ffmpeg" else "/bin/ffprobe",
         ):
             self.assertFalse(process.check_readiness())
+
+    def test_dependencies_reject_client_without_interactions(self):
+        google = types.ModuleType("google")
+        google.genai = types.SimpleNamespace(Client=type("Client", (), {}))
+        modules = {
+            "cv2": types.ModuleType("cv2"),
+            "mediapipe": types.ModuleType("mediapipe"),
+            "numpy": types.ModuleType("numpy"),
+            "google": google,
+        }
+        with mock.patch.dict(process.sys.modules, modules):
+            self.assertFalse(process.dependencies_available())
+
+    def test_dependencies_accept_client_with_interactions(self):
+        google = types.ModuleType("google")
+        google.genai = types.SimpleNamespace(
+            Client=type("Client", (), {"interactions": property(lambda self: None)})
+        )
+        modules = {
+            "cv2": types.ModuleType("cv2"),
+            "mediapipe": types.ModuleType("mediapipe"),
+            "numpy": types.ModuleType("numpy"),
+            "google": google,
+        }
+        with mock.patch.dict(process.sys.modules, modules):
+            self.assertTrue(process.dependencies_available())
+
+    def test_environment_probe_checks_interactions_capability(self):
+        with (
+            mock.patch.object(
+                process, "venv_python", return_value=Path(process.sys.executable)
+            ),
+            mock.patch.object(process.subprocess, "run") as run,
+            mock.patch.object(process.os, "execve", side_effect=RuntimeError("stop")),
+            self.assertRaisesRegex(RuntimeError, "stop"),
+        ):
+            run.return_value.returncode = 0
+            process.ensure_environment()
+
+        probe = run.call_args.args[0]
+        self.assertIn("hasattr", probe[2])
+        self.assertIn("interactions", probe[2])
+
+    def test_failed_capability_probe_installs_requirements(self):
+        with (
+            mock.patch.object(
+                process, "venv_python", return_value=Path(process.sys.executable)
+            ),
+            mock.patch.object(process.subprocess, "run") as run,
+            mock.patch.object(process, "run_command") as install,
+            mock.patch.object(process.os, "execve", side_effect=RuntimeError("stop")),
+            self.assertRaisesRegex(RuntimeError, "stop"),
+        ):
+            run.return_value.returncode = 1
+            process.ensure_environment()
+
+        install.assert_called_once_with(
+            [
+                Path(process.sys.executable),
+                "-m",
+                "pip",
+                "install",
+                "-r",
+                process.REQUIREMENTS,
+            ]
+        )
 
     def test_prepare_upload_keeps_small_video(self):
         with tempfile.TemporaryDirectory() as directory:
