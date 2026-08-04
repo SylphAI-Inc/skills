@@ -34,8 +34,11 @@ def dependencies_available():
         import cv2  # noqa: F401
         import mediapipe  # noqa: F401
         import numpy  # noqa: F401
-        from google import genai  # noqa: F401
-    except ImportError:
+        from google import genai
+
+        if not hasattr(genai.Client, "interactions"):
+            return False
+    except (ImportError, TypeError):
         return False
     return True
 
@@ -51,7 +54,14 @@ def ensure_environment():
         run_command([sys.executable, "-m", "venv", VENV_DIR])
 
     check = subprocess.run(
-        [str(python), "-c", "import cv2, mediapipe, numpy; from google import genai"],
+        [
+            str(python),
+            "-c",
+            (
+                "import cv2, mediapipe, numpy; from google import genai; "
+                "assert hasattr(genai.Client, 'interactions')"
+            ),
+        ],
         capture_output=True,
     )
     if check.returncode != 0:

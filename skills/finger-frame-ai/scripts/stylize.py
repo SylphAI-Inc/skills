@@ -52,6 +52,11 @@ def main():
     from google import genai  # imported late so --help works without the dep
 
     client = genai.Client()
+    if not hasattr(client, "interactions"):
+        sys.exit(
+            "Gemini Omni requires google-genai>=2.3.0. Upgrade with: "
+            "python -m pip install --upgrade 'google-genai>=2.3.0'"
+        )
 
     print(f"Uploading {args.video} …")
     video_file = client.files.upload(file=args.video)
