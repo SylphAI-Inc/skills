@@ -3,4 +3,5 @@ __pycache__/
 *.task
 *.mp4
 *.mov
+!assets/finger-frame-skill.mov
 *.webm
