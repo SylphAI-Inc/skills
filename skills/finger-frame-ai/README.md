@@ -8,48 +8,26 @@ Turn a local video of a two-hand finger-frame gesture into an MP4 where the area
 - `ffmpeg` and `ffprobe` available on `PATH`
 - A Gemini API key with `gemini-omni-flash-preview` access and quota
 
-Set the key locally—never paste it into chat or commit it:
-
-```bash
-export GEMINI_API_KEY='YOUR_API_KEY'
-```
-
 Gemini processing may take several minutes and may incur API charges.
 
 ## How to use
 
-1. Clone the repository and enter the skill directory:
+1. Install AdaL:
 
    ```bash
-   git clone https://github.com/SylphAI-Inc/skills.git
-   cd skills/skills/finger-frame-ai
+   curl -fsSL https://adal.sylph.ai/install.sh | bash
    ```
 
-2. Check that Python, FFmpeg, and your API key are ready:
-
-   ```bash
-   python3 scripts/process.py --check
-   ```
-
-3. Run the pipeline with an absolute path to your video:
-
-   ```bash
-   python3 scripts/process.py "/absolute/path/to/input.mov"
-   ```
-
-   For a custom visual style:
-
-   ```bash
-   python3 scripts/process.py "/absolute/path/to/input.mov" \
-     --prompt "Transform the scene into hand-painted watercolor animation while preserving the original motion and framing."
-   ```
-
-4. Find the finished video beside the source as:
+2. In AdaL, install the skills plugin:
 
    ```text
-   input-finger-frame.mp4
+   /plugin install SylphAI-Inc/skills
    ```
 
-   The original video is not modified. For best tracking, keep both hands visible with the index fingers and thumbs forming opposing “L” shapes.
+3. Configure your Gemini API key:
+
+   ```bash
+   export GEMINI_API_KEY='YOUR_API_KEY'
+   ```
 
 **Final result reference:** [Watch `finger-frame-skill.mov`](./assets/finger-frame-skill.mov)
