@@ -1,6 +1,6 @@
 ---
 name: finger-frame-ai
-description: Generate a finished finger-frame effect video from a local clip using Gemini Omni restyling, MediaPipe hand tracking, and FFmpeg compositing. Use when someone asks to make, create, restyle, or process a video where a two-hand finger-frame becomes a window into an AI-stylized world.
+description: Generate a finished cyberpunk-styled finger-frame effect video from a local clip using Gemini Omni restyling, MediaPipe hand tracking, and FFmpeg compositing. Use when someone asks to make, create, restyle, or process a video where a two-hand finger-frame becomes a window into an AI-stylized (default: neon cyberpunk CGI) world.
 author: shangliy
 version: 1.0.0
 ---
@@ -59,7 +59,7 @@ Short clips are faster and cheaper. Sources larger than 15 MB are automatically 
 
 ### 3. Generate
 
-Default 3D animated-movie style:
+Default cyberpunk-styled 3D animated-movie look:
 
 ```bash
 python3 <skill>/scripts/process.py "/absolute/path/to/input.mov"
