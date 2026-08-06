@@ -1,5 +1,7 @@
 # codegraph
 
+*[中文](./README.zh-CN.md)*
+
 **Turn any codebase into an explorable interactive graph — one self-contained HTML file.**
 
 A deterministic scan extracts files, imports, symbols, call edges, PageRank
