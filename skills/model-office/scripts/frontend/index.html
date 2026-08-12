@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Model Office</title>
+<style>
+  @font-face {
+    font-family: "PixelFont";
+    src: local("Courier New");
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #1b1035;
+    color: #eee;
+    font-family: "Courier New", monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+  }
+  h1 {
+    margin: 16px 0 4px;
+    letter-spacing: 2px;
+    font-size: 20px;
+    color: #ffd166;
+    text-shadow: 2px 2px #000;
+  }
+  #sub {
+    font-size: 12px;
+    color: #a89bd0;
+    margin-bottom: 12px;
+  }
+  #taskBar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    width: 900px;
+  }
+  #taskInput {
+    flex: 1;
+    padding: 10px 12px;
+    font-family: inherit;
+    font-size: 14px;
+    background: #2a1a4a;
+    border: 2px solid #ffd166;
+    color: #fff;
+    border-radius: 4px;
+  }
+  #taskBtn {
+    padding: 10px 20px;
+    font-family: inherit;
+    font-size: 14px;
+    background: #ffd166;
+    border: 2px solid #ffd166;
+    color: #1b1035;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  #taskBtn:hover { background: #ffe08a; }
+  #taskBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+  #officeWrap {
+    position: relative;
+    width: 900px;
+    height: 480px;
+    background: #241645;
+    border: 4px solid #4a3a7a;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  canvas { display: block; }
+  #log {
+    width: 900px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #150a29;
+    border: 2px solid #4a3a7a;
+    margin-top: 12px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 4px;
+  }
+  .logLine { margin-bottom: 6px; }
+  .tag { color: #ffd166; font-weight: bold; }
+  .tag-claude { color: #ff9f6b; }
+  .tag-gpt { color: #7fe6b0; }
+  .tag-sonar { color: #8fb8ff; }
+</style>
+</head>
+<body>
+  <h1>&#127968; MODEL OFFICE</h1>
+  <div id="sub">type a task &rarr; watch it get routed to the model best suited for it</div>
+  <div id="taskBar">
+    <input id="taskInput" type="text" placeholder="e.g. Plan a product launch, write the announcement, and research competitor pricing" />
+    <button id="taskBtn">Dispatch</button>
+  </div>
+  <div id="officeWrap">
+    <canvas id="office" width="900" height="480"></canvas>
+  </div>
+  <div id="log"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
