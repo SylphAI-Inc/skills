@@ -19,7 +19,8 @@
         "./skills/clone-anywebsite",
         "./skills/glowmotion",
         "./skills/codegraph",
-        "./skills/finger-frame-ai"
+        "./skills/finger-frame-ai",
+        "./skills/model-office"
       ]
     },
     {
