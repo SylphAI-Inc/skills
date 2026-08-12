@@ -1,0 +1,80 @@
+name: Validate Skills
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    name: Validate SKILL.md frontmatter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
+      - name: Validate all SKILL.md files
+        run: |
+          python3 << 'EOF'
+          import sys, yaml, re
+          from pathlib import Path
+
+          errors = []
+          skills_dir = Path("skills")
+          if not skills_dir.exists():
+              print("No skills/ directory found")
+              sys.exit(0)
+
+          for skill_dir in sorted(skills_dir.iterdir()):
+              skill_md = skill_dir / "SKILL.md"
+              if not skill_md.exists():
+                  continue
+
+              content = skill_md.read_text()
+              if not content.startswith("---"):
+                  errors.append(f"{skill_md}: Missing YAML frontmatter (must start with ---)")
+                  continue
+
+              try:
+                  end = content.index("---", 3)
+              except ValueError:
+                  errors.append(f"{skill_md}: No closing --- for frontmatter")
+                  continue
+
+              raw_fm = content[3:end]
+              try:
+                  data = yaml.safe_load(raw_fm)
+              except yaml.YAMLError as e:
+                  errors.append(f"{skill_md}: Invalid YAML frontmatter: {e}")
+                  continue
+
+              if not isinstance(data, dict):
+                  errors.append(f"{skill_md}: Frontmatter is not a mapping")
+                  continue
+
+              # Required fields
+              for field in ("name", "description"):
+                  if field not in data:
+                      errors.append(f"{skill_md}: Missing required field '{field}'")
+
+              # Name must be kebab-case
+              name = data.get("name", "")
+              if name and not re.match(r"^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$", name):
+                  errors.append(f"{skill_md}: name '{name}' is not valid kebab-case")
+
+              print(f"  ✓ {skill_dir.name}")
+
+          if errors:
+              print(f"\n❌ {len(errors)} error(s) found:\n")
+              for e in errors:
+                  print(f"  • {e}")
+              sys.exit(1)
+          else:
+              print(f"\n✅ All skills validated successfully")
+          EOF

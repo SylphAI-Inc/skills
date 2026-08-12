@@ -1,0 +1,2589 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__TITLE__ · codegraph</title>
+<style>
+:root{
+  /* Deep-field palette: near-black navy canvas, cool ink, glass chrome. */
+  --bg:#04050c; --bg2:rgba(140,165,255,.055); --bg3:rgba(140,165,255,.10);
+  --panel:rgba(11,15,30,.52); --panel-solid:rgba(9,12,26,.86);
+  --line:rgba(160,180,255,.12); --line2:rgba(160,180,255,.20);
+  --fg:rgba(235,240,255,.94); --fg2:rgba(235,240,255,.62); --fg3:rgba(235,240,255,.38);
+  --accent:#8ec8ff; --accent2:#c98cff; --hot:#ffd98a;
+  --shadow:0 24px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(190,205,255,.07);
+  --radius:14px;
+  --blur:blur(16px) saturate(1.3);
+  --track:.18em;
+}
+html[data-theme="light"]{
+  --bg:#eef1f7; --bg2:rgba(40,70,140,.05); --bg3:rgba(40,70,140,.10);
+  --panel:rgba(255,255,255,.72); --panel-solid:rgba(255,255,255,.94);
+  --line:rgba(30,50,110,.13); --line2:rgba(30,50,110,.22);
+  --fg:#141a2c; --fg2:rgba(20,26,44,.66); --fg3:rgba(20,26,44,.42);
+  --accent:#2563eb; --accent2:#7c3aed; --hot:#b45309;
+  --shadow:0 18px 50px rgba(20,30,60,.14), inset 0 1px 0 rgba(255,255,255,.7);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg); color:var(--fg); overflow:hidden;
+  font:13px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+#stage{position:fixed;inset:0}
+canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
+#cv{cursor:grab}
+#cv.dragging{cursor:grabbing}
+/* The overlay only paints motion; all pointer input belongs to the base canvas. */
+#fx{pointer-events:none}
+
+/* Glass chrome, lifted off the canvas by blur + inner highlight.
+   Explicit stacking order — the views are z-index 1-2, so every floating panel
+   must sit above them or the view layer eats its clicks:
+     canvases 0 · views 1-2 · panels 10 · tour 20 · tooltip 99 */
+.panel{position:fixed;background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);box-shadow:var(--shadow);z-index:10;
+  backdrop-filter:var(--blur); -webkit-backdrop-filter:var(--blur)}
+
+/* HUD wakes up in a staggered cascade, like the atlas opening. */
+@keyframes hudIn{from{opacity:0;transform:translateY(-6px)}}
+@keyframes hudInUp{from{opacity:0;transform:translateY(8px)}}
+#top{animation:hudIn .9s cubic-bezier(.22,1,.36,1) backwards}
+#rail{animation:hudIn 1s cubic-bezier(.22,1,.36,1) .18s backwards}
+#help{animation:hudInUp 1s ease .5s backwards}
+@media (prefers-reduced-motion:reduce){
+  #top,#rail,#help{animation:none}
+}
+
+/* ---- top bar ---- */
+#top{top:12px;left:12px;right:12px;display:flex;gap:8px;align-items:center;
+  padding:8px 10px;flex-wrap:wrap}
+#top h1{font-size:13px;margin:0 8px 0 4px;font-weight:500;white-space:nowrap;
+  letter-spacing:.16em;text-indent:.16em;
+  text-shadow:0 0 24px rgba(120,150,255,.35)}
+#top h1 small{color:var(--fg3);font-weight:400;margin-left:8px;
+  font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;text-shadow:none}
+#search{flex:1;min-width:170px;background:var(--bg2);border:1px solid var(--line);
+  color:var(--fg);padding:7px 14px;border-radius:999px;font:inherit;outline:none;
+  letter-spacing:.06em;transition:border-color .3s,background .3s}
+#search::placeholder{color:var(--fg3);letter-spacing:.1em}
+#search:focus{border-color:var(--line2);background:var(--bg3)}
+button,select{background-color:var(--bg2);color:var(--fg2);border:1px solid var(--line);
+  border-radius:999px;padding:6px 13px;font:inherit;font-size:11.5px;cursor:pointer;
+  white-space:nowrap;letter-spacing:.12em;
+  transition:color .35s ease,background-color .35s ease,border-color .35s ease,box-shadow .35s ease}
+/* The dropdown LIST is painted by the OS, not by our CSS — color-scheme is the
+   only way to make it follow the theme. Without it the popup stays white. */
+select{border-radius:999px;padding:6px 26px 6px 11px;color-scheme:dark;
+  appearance:none;-webkit-appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--fg2) 50%),
+                   linear-gradient(135deg,var(--fg2) 50%,transparent 50%);
+  background-position:calc(100% - 14px) 52%,calc(100% - 9px) 52%;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+html[data-theme="light"] select{color-scheme:light}
+/* Explicit option colors for the platforms that honour them (Windows/Linux). */
+select option{background:#0b1020;color:#e8ecf8}
+html[data-theme="light"] select option{background:#fff;color:#141a2c}
+button:hover{color:var(--fg);background:var(--bg3)}
+/* Only recolor the select on hover — a background shorthand would wipe the arrow. */
+select:hover{color:var(--fg);background-color:var(--bg3);border-color:var(--line2)}
+button:disabled{opacity:.35;cursor:default}
+button:disabled:hover{color:var(--fg2);background:var(--bg2)}
+/* Active toggles glow rather than invert — keeps the dark canvas calm. */
+button.on{color:var(--fg);background:var(--bg3);border-color:var(--line2);
+  box-shadow:0 0 0 1px var(--line2),0 0 16px -2px var(--accent);
+  text-shadow:0 0 12px var(--accent)}
+.sep{width:1px;height:18px;background:var(--line);margin:0 3px}
+
+/* ---- overview: authored-looking architecture diagram (glowmotion idiom) ---- */
+#modes{display:flex;gap:3px;padding:2px;border:1px solid var(--line);border-radius:999px;
+  background:var(--bg2)}
+#modes button{border:0;background:transparent;padding:5px 13px}
+#modes button.on{background:var(--bg3);border-color:transparent}
+#ov{position:fixed;inset:56px 0 0 0;overflow:auto;display:none;z-index:1}
+#ov.show{display:block}
+#ovScroll{min-height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;padding:26px 26px 84px}
+#ovSvg{max-width:min(1180px,100%);height:auto;overflow:visible}
+
+/* rows read as faint architectural bands */
+.ov-band{fill:currentColor;opacity:.05}
+.ov-bandlabel{font:400 8px ui-sans-serif,system-ui,sans-serif;letter-spacing:.26em;
+  fill:currentColor;opacity:.75;text-transform:uppercase}
+
+/* module boxes: glow ring + translucent fill, like a lit component */
+.ov-box{cursor:pointer}
+.ov-box rect{fill:var(--ovFill);stroke:currentColor;stroke-width:1.2;
+  transition:filter .35s ease,stroke-width .35s ease}
+.ov-box:hover rect{stroke-width:2;filter:drop-shadow(0 0 10px currentColor)}
+.ov-box.hot rect{stroke-width:2}
+.ov-name{font:600 10.5px ui-sans-serif,system-ui,sans-serif;fill:var(--fg);
+  letter-spacing:.02em;pointer-events:none}
+.ov-meta{font:400 7.5px ui-monospace,"SF Mono",Menlo,monospace;fill:var(--fg3);
+  letter-spacing:.06em;pointer-events:none}
+.ov-badge{font:400 7px ui-sans-serif,system-ui,sans-serif;fill:currentColor;
+  letter-spacing:.14em;text-transform:uppercase;pointer-events:none;opacity:.9}
+
+/* connectors: dash-flow animation carries direction without any JS */
+.ov-link{fill:none;stroke:var(--ovLink);stroke-width:1;opacity:.4;
+  stroke-dasharray:5 4;animation:ovFlow 1.1s linear infinite}
+.ov-link.heavy{stroke-width:1.7;opacity:.62}
+.ov-link.path{stroke:var(--accent);opacity:.9;stroke-width:1.8;stroke-dasharray:none;
+  filter:drop-shadow(0 0 5px var(--accent))}
+@keyframes ovFlow{to{stroke-dashoffset:-18}}
+
+/* the journey comet: a dot riding the authored route, with two fading trails */
+.ov-comet{fill:var(--accent);filter:drop-shadow(0 0 6px var(--accent))}
+.ov-trail{fill:var(--accent);opacity:.4}
+.ov-halo{fill:none;stroke:var(--accent);opacity:0;animation:ovHalo 2.6s ease-in-out infinite}
+@keyframes ovHalo{
+  0%,100%{opacity:0;stroke-width:1}
+  40%{opacity:.55;stroke-width:2}
+}
+.ov-arrow{fill:var(--ovLink);opacity:.55}
+.ov-arrow.path{fill:var(--accent);opacity:.95}
+
+#ovLegend{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  display:flex;gap:16px;align-items:center;font-size:10px;letter-spacing:.14em;
+  color:var(--fg3);padding:7px 16px;z-index:2;display:none}
+#ovLegend.show{display:flex}
+#ovLegend i{display:inline-block;width:16px;height:0;border-top:1.6px solid;
+  margin-right:6px;vertical-align:middle}
+#ovHint{text-align:center;color:var(--fg3);font-size:11px;line-height:1.7;
+  letter-spacing:.04em;margin-top:20px;max-width:min(720px,90%)}
+
+html[data-theme="dark"]{--ovFill:rgba(12,18,36,.72);--ovLink:#8ea6d8}
+html[data-theme="light"]{--ovFill:rgba(255,255,255,.9);--ovLink:#5b6b8c}
+/* ⏸ stops the CSS dash-flow; SMIL comets are paused via pauseAnimations() */
+#ov.paused .ov-link,#ov.paused .ov-halo{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){
+  .ov-link,.ov-halo{animation:none}
+}
+
+/* ---- star map: the Physics-atlas reading of the same graph ---- */
+#sky{position:fixed;inset:56px 0 0 0;display:none;z-index:1;
+  background:radial-gradient(ellipse at 50% 45%,#0a1024 0%,#04050c 62%,#020307 100%)}
+#sky.show{display:block}
+#skyCv{position:absolute;inset:0;width:100%;height:100%;cursor:crosshair}
+#skyHint{position:absolute;bottom:16px;left:0;right:0;text-align:center;
+  font-size:10px;letter-spacing:.26em;color:var(--fg3);pointer-events:none;
+  text-transform:uppercase}
+html[data-theme="light"] #sky{
+  background:radial-gradient(ellipse at 50% 45%,#fbfcff 0%,#eef1f7 60%,#e6eaf3 100%)}
+
+/* ---- left rail ---- */
+#rail{left:12px;top:64px;width:212px;max-height:calc(100vh - 92px);overflow-y:auto;padding:10px}
+#rail h2{font-size:9.5px;text-transform:uppercase;letter-spacing:.28em;color:var(--fg3);
+  margin:2px 0 9px;font-weight:400}
+#rail section{margin-bottom:16px}
+.lyr{display:flex;align-items:center;gap:8px;padding:4px 7px;border-radius:999px;cursor:pointer;
+  font-size:11.5px;user-select:none;letter-spacing:.05em;border:1px solid transparent;
+  transition:color .4s ease,background .4s ease,border-color .4s ease}
+.lyr:hover{color:var(--fg);background:var(--bg2)}
+.lyr.on{background:var(--bg3);border-color:var(--line)}
+.lyr.off{opacity:.3}
+.dot{width:7px;height:7px;border-radius:50%;flex:none;
+  box-shadow:0 0 10px currentColor;transition:box-shadow .4s ease}
+.lyr:hover .dot{box-shadow:0 0 16px currentColor}
+.lyr .ct{margin-left:auto;color:var(--fg3);font-size:9.5px;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.stat{display:flex;justify-content:space-between;font-size:11px;color:var(--fg2);padding:2px 6px;
+  letter-spacing:.05em}
+.stat b{color:var(--fg);font-weight:500;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:11.5px}
+#hits{list-style:none;margin:0;padding:0;max-height:210px;overflow-y:auto}
+#hits li{padding:5px 8px;border-radius:8px;cursor:pointer;font-size:11.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.04em;
+  transition:background .25s,color .25s}
+#hits li:hover{background:var(--bg3);color:var(--accent)}
+/* "Start here": the entry points, so a new reader has an obvious first click. */
+#entryList div{padding:5px 8px;border-radius:8px;cursor:pointer;font-size:11.5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.03em;
+  color:var(--fg2);transition:background .25s,color .25s}
+#entryList div:hover{background:var(--bg3);color:var(--accent)}
+#entryList div b{color:var(--fg);font-weight:500}
+#entryList div i{font-style:normal;color:var(--fg3);font-size:9.5px;
+  display:block;letter-spacing:.02em}
+
+/* ---- inspector ---- */
+#info{right:12px;top:64px;width:322px;max-height:calc(100vh - 92px);overflow-y:auto;
+  padding:12px;display:none}
+#info.show{display:block}
+#info{animation:hudIn .5s cubic-bezier(.22,1,.36,1)}
+#info .kind{font-size:9px;text-transform:uppercase;letter-spacing:.3em;color:var(--accent);
+  font-weight:400;display:flex;align-items:center;justify-content:space-between;gap:8px}
+#info .kind button{font-size:9px;letter-spacing:.18em;padding:3px 9px;text-transform:none}
+#info h3{margin:8px 0 3px;font-size:17px;word-break:break-word;line-height:1.3;
+  font-weight:500;letter-spacing:.06em;text-shadow:0 0 18px rgba(140,170,255,.3)}
+#info .path{color:var(--fg3);font-size:10px;word-break:break-all;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;margin-bottom:11px;letter-spacing:.02em}
+#info .sum{font-size:12.5px;line-height:1.75;color:var(--fg);background:var(--bg2);
+  padding:10px 12px;border-radius:10px;margin-bottom:11px;letter-spacing:.02em;
+  border-left:2px solid var(--accent);box-shadow:inset 0 0 24px -8px var(--accent)}
+#info .sum.none{color:var(--fg3);border-left-color:var(--line);font-style:italic;box-shadow:none}
+/* Extracted-from-source summaries are labelled, so their provenance is honest. */
+#info .sum.doc{border-left-color:var(--fg3);box-shadow:none}
+#info .sum i{display:block;margin-top:6px;font-size:9px;font-style:normal;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--fg3)}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:11px}
+.cell{background:var(--bg2);border-radius:9px;padding:6px 9px;border:1px solid var(--line)}
+.cell .k{font-size:8.5px;text-transform:uppercase;color:var(--fg3);letter-spacing:.2em}
+.cell .v{font-size:13px;font-weight:500;margin-top:1px;letter-spacing:0;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:11px}
+.tag{background:var(--bg2);border:1px solid var(--line);color:var(--fg2);
+  border-radius:999px;padding:2px 10px;font-size:10px;letter-spacing:.1em}
+#info h4{font-size:9px;text-transform:uppercase;letter-spacing:.26em;color:var(--fg3);
+  margin:14px 0 6px;display:flex;justify-content:space-between;font-weight:400}
+.rel{list-style:none;margin:0;padding:0}
+.rel li{padding:4px 7px;border-radius:7px;cursor:pointer;font-size:11.5px;
+  display:flex;gap:8px;align-items:baseline;transition:background .25s}
+.rel li:hover{background:var(--bg3)}
+.rel .ico{color:var(--fg3);font-size:8.5px;flex:none;width:46px;letter-spacing:.06em;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rel .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent)}
+.empty{color:var(--fg3);font-size:11px;font-style:italic;padding:2px 6px}
+
+/* ---- tour ---- */
+/* Above #ov (z-index:1), or the overview's scroll layer swallows the tour's
+   own Prev/Next/Close buttons and the panel becomes uncontrollable. */
+#tour{bottom:16px;left:50%;transform:translateX(-50%) translateY(14px);
+  width:min(680px,calc(100vw - 32px));padding:15px 20px 17px;z-index:20;
+  opacity:0;pointer-events:none;display:block;
+  transition:opacity .5s ease,transform .5s cubic-bezier(.22,1,.36,1)}
+#tour.show{opacity:1;pointer-events:auto;transform:translateX(-50%) translateY(0)}
+#tour .hd{display:flex;align-items:center;gap:11px;margin-bottom:7px}
+#tour .ti{font-weight:500;font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--fg)}
+#tour .ct{margin-left:auto;color:var(--fg3);font-size:10px;
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;letter-spacing:.04em}
+#tour .note{font-size:13.5px;line-height:1.85;color:var(--fg2);min-height:44px;
+  letter-spacing:.03em;transition:opacity .35s ease}
+#tour.swap .note{opacity:0}
+#tour .note b{color:var(--accent);font-weight:500;
+  text-shadow:0 0 14px color-mix(in srgb,var(--accent) 60%,transparent)}
+#bar{height:1px;background:var(--line);border-radius:1px;margin-top:11px;overflow:hidden}
+#bar div{height:100%;transition:width .4s cubic-bezier(.22,1,.36,1);
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--accent) 55%,transparent),var(--accent))}
+
+#tip{position:fixed;pointer-events:none;background:var(--panel-solid);color:var(--fg);
+  padding:5px 10px;border:1px solid var(--line);border-radius:8px;font-size:10.5px;
+  display:none;z-index:99;max-width:360px;letter-spacing:.03em;
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#help{position:fixed;bottom:14px;right:16px;color:var(--fg3);font-size:10px;text-align:right;
+  line-height:1.9;pointer-events:none;letter-spacing:.16em}
+kbd{background:var(--bg2);border:1px solid var(--line);border-radius:4px;padding:0 5px;
+  font-size:9px;font-family:ui-monospace,"SF Mono",Menlo,monospace;color:var(--fg2)}
+#empty{position:fixed;inset:0;display:none;place-items:center;color:var(--fg3);font-size:12px;
+  letter-spacing:.2em}
+::-webkit-scrollbar{width:7px;height:7px}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent)}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <!-- Motion overlay: starfield, comet packets and halos. Static scene stays cached below. -->
+  <canvas id="fx"></canvas>
+</div>
+<!-- Overview: the glowmotion-style architecture diagram. Crisp SVG, CSS/SMIL
+     animated, click a module to drill into the explore view. -->
+<div id="ov"><div id="ovScroll"></div></div>
+<!-- Star map: the same modules read as mass instead of layers. Canvas, because
+     hundreds of glowing sprites are cheaper to paint than to put in the DOM. -->
+<div id="sky"><canvas id="skyCv"></canvas><div id="skyHint"></div></div>
+<div id="empty">No nodes match the current filters.</div>
+
+<div class="panel" id="top">
+  <h1>__TITLE__<small id="sub"></small></h1>
+  <input id="search" placeholder="Search files, symbols, folders…  (press /)" autocomplete="off" spellcheck="false">
+  <div class="sep"></div>
+  <div id="modes" role="tablist" aria-label="View">
+    <button id="mOverview" class="on" role="tab" title="Architecture overview (Tab)">overview</button>
+    <button id="mStar" role="tab" title="Star map — mass and clustering (Tab)">star map</button>
+    <button id="mExplore" role="tab" title="Explore every file (Tab)">explore</button>
+  </div>
+  <div class="sep"></div>
+  <select id="view" title="Detail level">
+    <option value="module">Folders</option>
+    <option value="file" selected>Files</option>
+    <option value="symbol">Symbols</option>
+  </select>
+  <button id="bImports" class="on" title="Show import edges">imports</button>
+  <button id="bCalls" title="Show inferred call edges">calls</button>
+  <button id="bExt" title="Show external dependencies">deps</button>
+  <div class="sep"></div>
+  <button id="bHier" class="on" title="Expand level by level from the project root (H)">layers</button>
+  <button id="bFold" class="on" title="Fold edges of hub files (F) — biggest declutter">simplify</button>
+  <button id="bHood" title="Show only the selected node and its direct neighbours (N)">focus</button>
+  <button id="bEntry" title="Highlight entry points">entries</button>
+  <button id="bCycles" title="Highlight dependency cycles">cycles</button>
+  <button id="bTour" title="Guided tours">tour</button>
+  <div class="sep"></div>
+  <button id="bFit" title="Fit to view (0)">fit</button>
+  <button id="bMotion" class="on" title="Pause / resume motion (space)">⏸</button>
+  <button id="bTheme" title="Toggle theme (T)">◐</button>
+</div>
+
+<div class="panel" id="rail">
+  <section id="startHere" style="display:none">
+    <h2>Start here</h2>
+    <div id="entryList"></div>
+  </section>
+  <section>
+    <h2>Overview</h2>
+    <div id="stats"></div>
+  </section>
+  <section>
+    <h2>Layers</h2>
+    <div id="layers"></div>
+  </section>
+  <section id="hitsWrap" style="display:none">
+    <h2>Matches</h2>
+    <ul id="hits"></ul>
+  </section>
+</div>
+
+<div class="panel" id="info"></div>
+
+<div class="panel" id="tour">
+  <div class="hd">
+    <span class="ti" id="tTitle"></span>
+    <span class="ct" id="tCount"></span>
+    <button id="tPrev" title="Previous ([)">‹</button>
+    <button id="tNext" title="Next (])">›</button>
+    <button id="tClose" title="Close">✕</button>
+  </div>
+  <div class="note" id="tNote"></div>
+  <div id="bar"><div style="width:0"></div></div>
+</div>
+
+<div class="panel" id="ovLegend">
+  <span><i style="border-top-style:dashed"></i>imports</span>
+  <span><i style="border-color:var(--accent)"></i>primary path</span>
+  <span style="opacity:.8">click a module to explore its files</span>
+</div>
+
+<div id="tip"></div>
+<div id="help">
+  <div><kbd>Tab</kbd> overview / explore · <kbd>F</kbd> simplify · <kbd>N</kbd> focus · <kbd>/</kbd> search · <kbd>0</kbd> fit · <kbd>T</kbd> theme · <kbd>P</kbd> tour · <kbd>space</kbd> motion</div>
+  <div>click a hub's <b>⋯n</b> badge to reveal its edges · drag to pan · scroll to zoom</div>
+</div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+"use strict";
+const G = JSON.parse(document.getElementById("data").textContent);
+
+/* ------------------------------------------------------------------ palette */
+const LAYER_COLORS = {
+  entry:"#f472b6", ui:"#38bdf8", api:"#22d3ee", service:"#a78bfa", data:"#34d399",
+  util:"#94a3b8", config:"#fbbf24", infra:"#fb923c", test:"#64748b", docs:"#4ade80",
+  other:"#7c8797", external:"#475569"
+};
+const LAYER_NAMES = {};
+(G.layers||[]).forEach(l => LAYER_NAMES[l.id] = l.name);
+const layerColor = id => LAYER_COLORS[id] || LAYER_COLORS.other;
+
+/* ------------------------------------------------------------------ indexes */
+const NODES = G.nodes, EDGES = G.edges;
+const byId = new Map(NODES.map(n => [n.id, n]));
+const cycleSet = new Set((G.cycles||[]).flat());
+/** Append to a Map-of-arrays bucket. */
+function bucket(map, key) {
+  let arr = map.get(key);
+  if (!arr) { arr = []; map.set(key, arr); }
+  return arr;
+}
+const adjOut = new Map(), adjIn = new Map();
+for (const e of EDGES) {
+  if (e.type === "contains") continue;
+  bucket(adjOut, e.source).push(e);
+  bucket(adjIn, e.target).push(e);
+}
+const childrenOf = new Map();
+for (const e of EDGES) {
+  if (e.type !== "contains") continue;
+  bucket(childrenOf, e.source).push(e.target);
+}
+
+const STRUCT = { module:0, file:1, symbol:2 };
+function tier(n) {
+  if (n.type === "module") return 0;
+  if (n.type === "external") return 1;
+  if (n.type === "file" || n.type === "config" || n.type === "document") return 1;
+  return 2;
+}
+
+/* ------------------------------------------------------------------ state */
+const S = {
+  mode: "overview",        // "overview" (authored diagram) | "explore" (full graph)
+  view: "file",
+  imports: true, calls: false, ext: false,
+  entries: false, cycles: false,
+  // Declutter defaults. A dense repo is unreadable with every edge drawn, so we
+  // start simple and let the reader add detail — the reverse of the old default.
+  // Hierarchy mode is the default way into explore: start at the root and open
+  // one level at a time. Flat mode (the old behaviour) stays one click away.
+  hier: true,
+  open: new Set(),         // expanded module ids
+  openFiles: new Set(),    // files whose symbols are revealed
+  foldHubs: true,          // collapse edges of very high-degree nodes
+  neighborhood: false,     // show only the selection and its direct neighbours
+  expanded: new Set(),     // hubs the reader explicitly opened
+  // Tests are often half a repo's files but are not its architecture, so they
+  // start hidden. The layer chip in the rail turns them back on.
+  hiddenLayers: new Set(["test"]),
+  query: "", selected: null, hover: null,
+  tourIdx: -1, tourStep: 0,
+  tx: 0, ty: 0, scale: 1,
+};
+
+let VN = [], VE = [];   // visible nodes / edges
+let BANDS = [];         // [{id, top, bottom, count}] vertical layer bands
+
+/* ---------------------------------------------------------------- hierarchy
+   Progressive disclosure. Instead of dumping every file at once, the explore
+   view starts at the project root and reveals one level per click, the way you
+   actually read an unfamiliar repo: what are the top folders -> which one holds
+   the entry point -> what is inside it -> which file do I open.
+
+   S.open holds the module ids the reader has expanded. A module's children are
+   visible only when the module itself is open; everything else collapses into
+   its nearest open ancestor. */
+
+const MOD_KIDS = new Map();          // module id -> child module ids
+const MOD_FILES = new Map();         // module id -> files directly inside
+for (const n of NODES) {
+  if (n.type === "module" && n.parent) bucket(MOD_KIDS, n.parent).push(n.id);
+}
+for (const n of NODES) {
+  if (n.module && (n.type === "file" || n.type === "config" || n.type === "document"))
+    bucket(MOD_FILES, n.module).push(n.id);
+}
+const ROOT_MOD = (NODES.find(n => n.type === "module" && !n.parent) || {}).id || "mod:.";
+
+/** Ancestor chain of a module, root first. */
+function modChain(id) {
+  const out = [];
+  let cur = byId.get(id);
+  while (cur) { out.unshift(cur.id); cur = cur.parent ? byId.get(cur.parent) : null; }
+  return out;
+}
+
+/** Open a module and every ancestor, so a deep target is actually reachable. */
+function openTo(id) {
+  for (const m of modChain(id)) S.open.add(m);
+}
+
+function visibleNodes() {
+  if (!S.hier) {                      // flat mode: the original behaviour
+    const want = STRUCT[S.view];
+    return NODES.filter(n => {
+      if (n.type === "external") return S.ext;
+      if (tier(n) > want) return false;
+      if (S.hiddenLayers.has(n.layer || "other")) return false;
+      return true;
+    });
+  }
+  const out = [];
+  const layerOk = n => !S.hiddenLayers.has(n.layer || "other");
+
+  // Walk the module tree; recurse only into open nodes.
+  const walk = id => {
+    const kids = MOD_KIDS.get(id) || [];
+    const files = MOD_FILES.get(id) || [];
+    if (S.open.has(id)) {
+      for (const k of kids) {
+        const kn = byId.get(k);
+        if (kn && layerOk(kn)) { out.push(kn); walk(k); }
+      }
+      // A module's own files appear once it is open.
+      for (const f of files) {
+        const fn = byId.get(f);
+        if (fn && layerOk(fn)) out.push(fn);
+      }
+    }
+  };
+  const rootNode = byId.get(ROOT_MOD);
+  if (rootNode) out.push(rootNode);
+  walk(ROOT_MOD);
+
+  // Symbols only for files the reader explicitly opened — never in bulk.
+  for (const fid of S.openFiles) {
+    for (const sid of (childrenOf.get(fid) || [])) {
+      const sn = byId.get(sid);
+      if (sn && sn.id.startsWith("sym:")) out.push(sn);
+    }
+  }
+  if (S.ext) for (const n of NODES) if (n.type === "external") out.push(n);
+  return out;
+}
+
+/** Does this node have anything left to reveal? Drives the +N affordance. */
+function hiddenChildCount(n) {
+  if (n.type === "module") {
+    if (S.open.has(n.id)) return 0;
+    return (MOD_KIDS.get(n.id) || []).length + (MOD_FILES.get(n.id) || []).length;
+  }
+  if (n.type === "file") {
+    if (S.openFiles.has(n.id)) return 0;
+    return (childrenOf.get(n.id) || []).length;
+  }
+  return 0;
+}
+
+/** Click behaviour in hierarchy mode: expand or collapse one level. */
+function toggleExpand(id) {
+  const n = byId.get(id);
+  if (!n) return false;
+  if (n.type === "module") {
+    S.open.has(id) ? S.open.delete(id) : S.open.add(id);
+  } else if (n.type === "file" && (childrenOf.get(id) || []).length) {
+    S.openFiles.has(id) ? S.openFiles.delete(id) : S.openFiles.add(id);
+  } else return false;
+  rebuild();
+  draw();
+  return true;
+}
+
+/** Lift an edge endpoint up to the deepest ancestor that is actually visible. */
+function liftMap(vset) {
+  const parent = new Map();
+  for (const [src, kids] of childrenOf) for (const k of kids) parent.set(k, src);
+  const cache = new Map();
+  return function lift(id) {
+    if (vset.has(id)) return id;
+    if (cache.has(id)) return cache.get(id);
+    let cur = id, out = null, guard = 0;
+    while (cur && guard++ < 12) {
+      cur = parent.get(cur);
+      if (cur && vset.has(cur)) { out = cur; break; }
+    }
+    cache.set(id, out);
+    return out;
+  };
+}
+
+/* Hub threshold, adaptive: on a small graph nothing should fold, on a large one
+   a handful of nodes carry most of the clutter. In deep_research 10 nodes own
+   23% of all edge endpoints — folding them alone removes ~48% of the lines. */
+const HUB_MIN = 14;
+let hubDegree = new Map();     // visible-node id -> degree within the current view
+let foldedCount = 0;           // edges hidden by folding, for the UI to report
+
+function computeDegrees(edges) {
+  const d = new Map();
+  for (const e of edges) {
+    d.set(e.source, (d.get(e.source) || 0) + 1);
+    d.set(e.target, (d.get(e.target) || 0) + 1);
+  }
+  return d;
+}
+
+function isFoldedHub(id) {
+  if (!S.foldHubs || S.expanded.has(id)) return false;
+  return (hubDegree.get(id) || 0) >= HUB_MIN;
+}
+
+function rebuild() {
+  VN = visibleNodes();
+  const vset = new Set(VN.map(n => n.id));
+  const lift = liftMap(vset);
+  const seen = new Map();
+  for (const e of EDGES) {
+    if (e.type === "contains") continue;
+    if (e.type === "imports"    && !S.imports) continue;
+    if (e.type === "calls"      && !S.calls)   continue;
+    if (e.type === "depends_on" && !S.ext)     continue;
+    const s = lift(e.source), t = lift(e.target);
+    if (!s || !t || s === t) continue;
+    const key = s + ">" + t + ">" + e.type;
+    const prev = seen.get(key);
+    if (prev) { prev.w++; continue; }
+    seen.set(key, { source:s, target:t, type:e.type, w:1 });
+  }
+  let edges = [...seen.values()];
+
+  // Degrees must be measured BEFORE folding, or folding changes its own input.
+  hubDegree = computeDegrees(edges);
+
+  const before = edges.length;
+
+  // Neighbourhood mode is already the strongest declutter, so it runs INSTEAD of
+  // folding — otherwise selecting a hub folds away the very edges you asked for.
+  if (S.neighborhood && S.selected) {
+    // Cap the fan-in of an extreme hub: state_manager.py has 76 importers, and
+    // drawing all of them is the same hairball at a smaller scale. Keep the most
+    // important neighbours — the inspector still lists every one of them.
+    const HOOD_MAX = 26;
+    const incident = edges.filter(e => e.source === S.selected || e.target === S.selected);
+    const ranked = incident
+      .map(e => {
+        const other = e.source === S.selected ? e.target : e.source;
+        return { other, imp: (byId.get(other) || {}).importance || 0 };
+      })
+      .sort((a, b) => b.imp - a.imp);
+    const keep = new Set([S.selected]);
+    for (const r of ranked) {
+      if (keep.size > HOOD_MAX) break;
+      keep.add(r.other);
+    }
+    edges = edges.filter(e => keep.has(e.source) && keep.has(e.target));
+    VN = VN.filter(n => keep.has(n.id));
+  } else if (S.foldHubs) {
+    edges = edges.filter(e => !isFoldedHub(e.source) && !isFoldedHub(e.target));
+  }
+  foldedCount = before - edges.length;
+  VE = edges;
+  refreshStats();
+  layout();
+  buildPackets();
+  document.getElementById("empty").style.display = VN.length ? "none" : "grid";
+}
+
+/* ------------------------------------------------------------------ layout
+   Layered by architecture (entry -> ui -> api -> service -> data -> util),
+   force-relaxed inside each band. Deterministic: seeded by node id hash. */
+const BAND_ORDER = ["entry","ui","api","service","data","util","config","infra","test","docs","other","external"];
+
+function hash(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0) / 4294967295;
+}
+
+/* Indented-tree layout for hierarchy mode. Layer bands answer "what kind of code
+   is this"; a tree answers "what contains what" — and while walking down from the
+   root, containment is the question the reader is actually asking. */
+function layoutTree() {
+  const ROW = 30, INDENT = 44;
+  let y = 0;
+  const vis = new Set(VN.map(n => n.id));
+
+  const walk = (id, depth) => {
+    const n = byId.get(id);
+    if (!n) return;
+    n.x = depth * INDENT;
+    n.y = y;
+    n.r = radius(n);
+    y += ROW + Math.max(0, n.r - 8);
+    const kidMods = (MOD_KIDS.get(id) || []).filter(k => vis.has(k))
+      .sort((a, b) => (byId.get(b).loc || 0) - (byId.get(a).loc || 0));
+    for (const k of kidMods) walk(k, depth + 1);
+    const kidFiles = (MOD_FILES.get(id) || []).filter(f => vis.has(f))
+      .sort((a, b) => (byId.get(b).importance || 0) - (byId.get(a).importance || 0));
+    for (const f of kidFiles) {
+      walk(f, depth + 1);
+      for (const s of (childrenOf.get(f) || [])) if (vis.has(s)) walk(s, depth + 2);
+    }
+  };
+  if (vis.has(ROOT_MOD)) walk(ROOT_MOD, 0);
+
+  // Externals hang to the side rather than pretending to be part of the tree.
+  let ey = 0;
+  for (const n of VN) {
+    if (n.type === "external") { n.x = -INDENT * 2.4; n.y = ey; n.r = radius(n); ey += 26; }
+  }
+  BANDS = [];                       // a tree has no layer bands
+  treeHeight = y;
+  frameTree();
+}
+
+let treeHeight = 0;
+
+/* A tree is tall and narrow. Scale to fit its HEIGHT (never below a legible
+   floor) and anchor left — fitting both axes would squash it into a column, and
+   a fixed scale=1 pushed most rows off-screen on a 350-file repo. */
+function frameTree() {
+  const availH = innerHeight - 150, availW = innerWidth - 300 - 360;
+  let sc = treeHeight > 0 ? availH / treeHeight : 1;
+  sc = Math.max(0.28, Math.min(1, sc));      // below ~0.28 text is unreadable
+  S.scale = sc;
+  S.tx = 268;
+  S.ty = 96;
+  // If the tree still overflows, the reader scrolls (drag) — same as an editor.
+}
+
+function layout() {
+  if (S.hier) { layoutTree(); return; }
+  const bands = new Map();
+  for (const n of VN) {
+    const b = n.layer || "other";
+    bucket(bands, b).push(n);
+  }
+  const active = BAND_ORDER.filter(b => bands.has(b));
+  const W = Math.max(1000, Math.min(2100, 260 * Math.ceil(Math.sqrt(VN.length))));
+  const ROW = 76;          // vertical pitch inside a band
+  const GAP = 132;         // breathing room + headroom for the band heading
+
+  // Bands stack with content-aware height so sparse layers leave no dead space.
+  BANDS = [];
+  let cursor = 0;
+  active.forEach(band => {
+    const list = bands.get(band);
+    // Group by owning folder so related files sit together instead of scattering.
+    const groups = new Map();
+    for (const n of list) {
+      const g = n.type === "module" ? "\u0000modules"
+              : n.type === "external" ? "\u0000external"
+              : (n.module || n.filePath || "").replace(/^mod:/, "");
+      bucket(groups, g).push(n);
+    }
+    const ordered = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);
+    const perRow = Math.max(5, Math.ceil(Math.sqrt(list.length * 2.6)));
+    const top = cursor;
+    let col = 0, row = 0;
+    for (const [, members] of ordered) {
+      members.sort((a, b) => (b.importance || b.loc || 0) - (a.importance || a.loc || 0));
+      // Keep a folder's files contiguous; wrap to a new row if it can't fit.
+      if (col > 0 && col + members.length > perRow && members.length <= perRow) {
+        col = 0; row++;
+      }
+      for (const n of members) {
+        const jx = (hash(n.id) - 0.5) * 26, jy = (hash(n.id + "y") - 0.5) * 20;
+        n.x = (col - (perRow - 1) / 2) * (W / perRow) + jx;
+        n.y = top + row * ROW + jy;
+        n.r = radius(n);
+        col++;
+        if (col >= perRow) { col = 0; row++; }
+      }
+      col++;                                  // one empty slot between folders
+      if (col >= perRow) { col = 0; row++; }
+    }
+    const height = row * ROW;
+    BANDS.push({ id: band, top: top, bottom: top + height, count: list.length });
+    cursor = top + height + GAP;
+  });
+
+  // Remember each node's home band, then relax without letting bands bleed.
+  const homeBand = new Map(BANDS.map(b => [b.id, b]));
+  for (const n of VN) n._band = homeBand.get(n.layer || "other");
+  relax();
+  // Clamp back into the owning band so headings never overlap another layer.
+  for (const n of VN) {
+    const b = n._band;
+    if (!b) continue;
+    const lo = b.top - ROW * 0.45, hi = b.bottom + ROW * 0.45;
+    if (n.y < lo) n.y = lo;
+    else if (n.y > hi) n.y = hi;
+  }
+
+  // Recompute extents from final positions so headings sit right above content.
+  for (const b of BANDS) { b._t = Infinity; b._b = -Infinity; }
+  for (const n of VN) {
+    const b = n._band;
+    if (!b) continue;
+    if (n.y - n.r < b._t) b._t = n.y - n.r;
+    if (n.y + n.r > b._b) b._b = n.y + n.r;
+  }
+  for (const b of BANDS) {
+    if (Number.isFinite(b._t)) { b.top = b._t; b.bottom = b._b; }
+  }
+  BANDS = BANDS.filter(b => Number.isFinite(b._t));
+  fit(false);
+}
+
+/* Overlap relaxation via a uniform spatial hash: only nearby pairs are compared,
+   which keeps big graphs (thousands of symbols) interactive instead of O(n^2). */
+function relax() {
+  const n = VN.length;
+  if (n < 2) return;
+  let maxR = 0;
+  for (const v of VN) if (v.r > maxR) maxR = v.r;
+  const cell = Math.max(24, maxR * 2 + 14);
+  const passes = n > 1800 ? 4 : n > 700 ? 8 : 18;
+  const grid = new Map();
+  const key = (cx, cy) => cx + "," + cy;
+
+  for (let pass = 0; pass < passes; pass++) {
+    grid.clear();
+    for (const v of VN) {
+      const k = key(Math.floor(v.x / cell), Math.floor(v.y / cell));
+      let b = grid.get(k);
+      if (!b) { b = []; grid.set(k, b); }
+      b.push(v);
+    }
+    let moved = 0;
+    for (const [k, bucketNodes] of grid) {
+      const [cx, cy] = k.split(",").map(Number);
+      const near = [];
+      for (let ox = -1; ox <= 1; ox++)
+        for (let oy = -1; oy <= 1; oy++) {
+          const nb = grid.get(key(cx + ox, cy + oy));
+          if (nb) near.push(nb);
+        }
+      for (const a of bucketNodes) {
+        for (const group of near) {
+          for (const b of group) {
+            if (a === b) continue;
+            let dx = b.x - a.x, dy = b.y - a.y;
+            const need = a.r + b.r + 12;
+            const d2 = dx*dx + dy*dy;
+            if (d2 > need*need) continue;
+            let d = Math.sqrt(d2);
+            if (d < 0.01) {           // exact overlap: nudge deterministically
+              dx = (hash(a.id) - 0.5) || 0.5; dy = (hash(b.id) - 0.5) || 0.5; d = 1;
+            }
+            const push = (need - d) / 2;
+            dx /= d; dy /= d;
+            a.x -= dx*push; a.y -= dy*push*0.5;
+            b.x += dx*push; b.y += dy*push*0.5;
+            moved++;
+          }
+        }
+      }
+    }
+    if (!moved) break;   // settled early
+  }
+}
+
+function radius(n) {
+  if (n.type === "module") return 11 + Math.min(17, Math.sqrt(n.fileCount || 1) * 3.4);
+  if (n.type === "external") return 6 + Math.min(9, Math.sqrt(n.usedBy || 1) * 1.7);
+  const base = 5.5 + Math.sqrt(Math.max(n.loc || 8, 4)) * 0.72;
+  return Math.min(25, base + (n.importance || 0) * 8);
+}
+
+/* ------------------------------------------------------------------ canvas */
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+const fx = document.getElementById("fx"), fctx = fx.getContext("2d");
+let DPR = 1;
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  for (const c of [cv, fx]) { c.width = innerWidth * DPR; c.height = innerHeight * DPR; }
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  fctx.setTransform(DPR,0,0,DPR,0,0);
+  buildStars();
+  if (SM && S.mode === "star") { skyResize(); drawSky(); }
+  draw();
+}
+addEventListener("resize", resize);
+
+function fit(redraw = true) {
+  if (!VN.length) return;
+  // In tree mode "fit" means "back to the top of the tree", not "squash both axes".
+  if (S.hier) {
+    frameTree();
+    if (redraw) draw();
+    return;
+  }
+  let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for (const n of VN) {
+    x0=Math.min(x0,n.x-n.r); x1=Math.max(x1,n.x+n.r);
+    y0=Math.min(y0,n.y-n.r); y1=Math.max(y1,n.y+n.r);
+  }
+  const padL = 240, padR = 350, padT = 82, padB = 96;
+  const w = x1-x0 || 1, h = y1-y0 || 1;
+  S.scale = Math.max(0.09, Math.min(2.4,
+    Math.min((innerWidth-padL-padR)/w, (innerHeight-padT-padB)/h)));
+  S.tx = padL + (innerWidth-padL-padR)/2 - (x0+x1)/2*S.scale;
+  S.ty = padT + (innerHeight-padT-padB)/2 - (y0+y1)/2*S.scale;
+  if (redraw) draw();
+}
+
+// hot = the colour used when the edge is in the focused neighbourhood.
+// label = what the relationship is called, in words, on the canvas.
+const EDGE_STYLE = {
+  imports:    { color:"#5b6c8f", hot:"#8ec8ff", dash:[7,5],  label:"imports" },
+  calls:      { color:"#8b6fd4", hot:"#c98cff", dash:[4,3],  label:"calls" },
+  depends_on: { color:"#475569", hot:"#94a3b8", dash:[2,4],  label:"depends on" },
+  inherits:   { color:"#34d399", hot:"#4ade80", dash:[6,3],  label:"inherits" },
+  contains:   { color:"#3a4560", hot:"#64748b", dash:[1,4],  label:"contains" },
+};
+
+/** The one true edge curve. Both canvases use it so dots ride the drawn line. */
+function edgeMid(a, b) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + Math.abs(b.x - a.x) * 0.055 };
+}
+function strokeEdge(c, a, b) {
+  const m = edgeMid(a, b);
+  c.beginPath();
+  c.moveTo(a.x, a.y);
+  c.quadraticCurveTo(m.x, m.y, b.x, b.y);
+  c.stroke();
+}
+function arrowHead(c, a, b, color) {
+  const m = edgeMid(a, b);
+  const ang = Math.atan2(b.y - m.y, b.x - m.x), h = 6 / S.scale;
+  const ex = b.x - Math.cos(ang) * b.r, ey = b.y - Math.sin(ang) * b.r;
+  const dash = c.getLineDash();
+  c.setLineDash([]);
+  c.beginPath();
+  c.moveTo(ex, ey);
+  c.lineTo(ex - Math.cos(ang - 0.4) * h, ey - Math.sin(ang - 0.4) * h);
+  c.lineTo(ex - Math.cos(ang + 0.4) * h, ey - Math.sin(ang + 0.4) * h);
+  c.closePath();
+  c.fillStyle = color;
+  c.fill();
+  c.setLineDash(dash);
+}
+
+/**
+ * Flowing edges + their relationship names, painted on the OVERLAY canvas.
+ * Only the focused node's own edges animate, so this stays cheap no matter how
+ * large the graph is — the expensive full-graph pass never repeats.
+ */
+const LIVE_EDGE_CAP = 140;   // frame budget: a 190-degree hub would cost ~36ms
+
+function liveEdgesFor(focus) {
+  // Only edges INCIDENT to the focus animate. Using the full neighbour set would
+  // also catch neighbour-to-neighbour links — 1341 edges on a hub like
+  // sqlalchemy's __init__.py, which blows the frame budget for no clarity gain.
+  const out = [];
+  for (const e of VE) {
+    if (e.source !== focus && e.target !== focus) continue;
+    const a = byId.get(e.source), b = byId.get(e.target);
+    if (!a || !b || a.x === undefined || b.x === undefined) continue;
+    out.push(e);
+    if (out.length >= LIVE_EDGE_CAP) break;
+  }
+  return out;
+}
+
+function drawLiveEdges(light) {
+  const focus = S.selected || S.hover;
+  if (!focus) return;
+  fctx.save();
+  fctx.translate(S.tx, S.ty);
+  fctx.scale(S.scale, S.scale);
+
+  const labels = [];
+  for (const e of liveEdgesFor(focus)) {
+    const a = byId.get(e.source), b = byId.get(e.target);
+    const st = EDGE_STYLE[e.type] || EDGE_STYLE.imports;
+    const outgoing = e.source === focus;
+    fctx.globalAlpha = 0.95;
+    fctx.strokeStyle = st.hot || st.color;
+    fctx.lineWidth = Math.max(0.5, 1.6 / S.scale);
+    fctx.setLineDash((st.dash || [7, 5]).map(v => v / S.scale));
+    // Dashes crawl toward the target, so direction is visible at a glance.
+    fctx.lineDashOffset = -(M.t * (outgoing ? 30 : 18)) / S.scale;
+    strokeEdge(fctx, a, b);
+    if (S.scale > 0.35) arrowHead(fctx, a, b, st.hot || st.color);
+    const m = edgeMid(a, b);
+    labels.push({ st, x: m.x, y: m.y, type: e.type });
+  }
+  fctx.setLineDash([]); fctx.lineDashOffset = 0; fctx.globalAlpha = 1;
+  drawEdgeLabels(labels, light, fctx);
+  fctx.restore();
+}
+
+/** Draw relationship names at edge midpoints, skipping any that would collide. */
+function drawEdgeLabels(items, light, c) {
+  if (!items.length || S.scale < 0.42) return;
+  const fs = Math.min(9.5 / S.scale, 30);
+  c.font = fs + "px ui-monospace,'SF Mono',Menlo,monospace";
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  const taken = [];
+  for (const it of items.slice(0, 24)) {
+    const text = it.st.label || it.type;
+    const w = text.length * fs * 0.58, h = fs * 1.5;
+    const box = [it.x - w/2, it.y - h/2, it.x + w/2, it.y + h/2];
+    let clash = false;
+    for (const t of taken) {
+      if (box[0] < t[2] && box[2] > t[0] && box[1] < t[3] && box[3] > t[1]) { clash = true; break; }
+    }
+    if (clash) continue;
+    taken.push(box);
+    // Plate behind the text so it stays readable over lines and glow.
+    c.fillStyle = light ? "rgba(255,255,255,.9)" : "rgba(5,8,18,.88)";
+    const r = Math.min(4 / S.scale, h / 2);
+    c.beginPath();
+    if (c.roundRect) c.roundRect(box[0] - 3/S.scale, box[1], w + 6/S.scale, h, r);
+    else c.rect(box[0] - 3/S.scale, box[1], w + 6/S.scale, h);
+    c.fill();
+    c.fillStyle = it.st.hot || it.st.color;
+    c.fillText(text, it.x, it.y);
+  }
+  c.textBaseline = "alphabetic";
+}
+
+function matches(n) {
+  if (!S.query) return false;
+  const q = S.query.toLowerCase();
+  return (n.name||"").toLowerCase().includes(q)
+      || (n.filePath||"").toLowerCase().includes(q)
+      || (n.summary||"").toLowerCase().includes(q)
+      || (n.tags||[]).some(t => t.toLowerCase().includes(q));
+}
+
+function neighborsOf(id) {
+  const set = new Set([id]);
+  for (const e of VE) {
+    if (e.source === id) set.add(e.target);
+    if (e.target === id) set.add(e.source);
+  }
+  return set;
+}
+
+function draw() {
+  const light = document.documentElement.dataset.theme === "light";
+  ctx.save();
+  ctx.fillStyle = light ? "#f6f7f9" : "#0b0f17";
+  ctx.fillRect(0,0,innerWidth,innerHeight);
+  ctx.translate(S.tx, S.ty); ctx.scale(S.scale, S.scale);
+
+  // Only treat a selection as "focus" when it is actually on screen. Selecting a
+  // node that later got collapsed away used to dim EVERYTHING, silently killing
+  // every label in the view.
+  const visSet = new Set(VN.map(n => n.id));
+  const focusRaw = S.selected || S.hover;
+  const focus = (focusRaw && visSet.has(focusRaw)) ? focusRaw : null;
+  const near = focus ? neighborsOf(focus) : null;
+  const tourNodes = currentTourNodes();
+
+  /* band separators + headings, drawn in world space so they track the graph */
+  let bx0 = 1e9, bx1 = -1e9;
+  for (const n of VN) { bx0 = Math.min(bx0, n.x - n.r); bx1 = Math.max(bx1, n.x + n.r); }
+  if (BANDS.length && bx1 > bx0) {
+    const pad = 26;
+    const head = 22 / S.scale;         // headroom for the heading, zoom-invariant
+    for (const b of BANDS) {
+      const col = layerColor(b.id);
+      ctx.globalAlpha = 0.07;
+      ctx.fillStyle = col;
+      ctx.fillRect(bx0 - pad, b.top - head - 6/S.scale,
+                   (bx1 - bx0) + pad*2, (b.bottom - b.top) + head + 18/S.scale);
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = col;
+      ctx.textAlign = "left";
+      ctx.font = "700 " + (11.5/S.scale) + "px ui-sans-serif,system-ui,sans-serif";
+      ctx.fillText((LAYER_NAMES[b.id] || b.id).toUpperCase() + "  ·  " + b.count,
+                   bx0 - pad + 5/S.scale, b.top - head + 4/S.scale);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* edges. The animated ones (focused neighbourhood) are NOT drawn here — they
+     move to the overlay so this expensive full-graph pass stays a one-off. */
+  // Distance LOD, borrowed from Physics-atlas' uReveal: zoomed far out the lines
+  // become noise, so they fade and let the layer bands carry the structure.
+  const reveal = focus ? 1 : Math.max(0, Math.min(1, (S.scale - 0.16) / 0.34));
+  const animated = focus && !REDUCED && M.on;
+  // Exactly the set the overlay will animate, so nothing is drawn twice or lost.
+  const liveSet = animated ? new Set(liveEdgesFor(focus)) : null;
+  for (const e of VE) {
+    const a = byId.get(e.source), b = byId.get(e.target);
+    if (!a || !b || a.x === undefined || b.x === undefined) continue;
+    const on = !focus || (near.has(e.source) && near.has(e.target));
+    if (liveSet && liveSet.has(e)) continue;   // overlay owns this one
+    const st = EDGE_STYLE[e.type] || EDGE_STYLE.imports;
+    ctx.globalAlpha = (on ? (focus ? 0.9 : 0.3) : 0.05) * (on && focus ? 1 : reveal);
+    if (ctx.globalAlpha < 0.012) continue;      // invisible: skip the stroke cost
+    ctx.strokeStyle = on && focus ? (st.hot || st.color) : st.color;
+    ctx.lineWidth = Math.max(0.4, 0.85 / S.scale);
+    ctx.setLineDash((st.dash || [7, 5]).map(v => v / S.scale));
+    ctx.lineDashOffset = 0;
+    strokeEdge(ctx, a, b);
+    if (focus && on && S.scale > 0.35) arrowHead(ctx, a, b, st.hot || st.color);
+  }
+  ctx.setLineDash([]); ctx.lineDashOffset = 0; ctx.globalAlpha = 1;
+
+  /* nodes — draw order puts important nodes last so their labels win */
+  // Always label something: collision detection already prevents overlap, so a
+  // low zoom simply yields fewer, larger, still-legible labels.
+  // Budget scales with zoom AND shrinks on crowded views: at 0.5x a 230-node
+  // graph cannot carry 200 labels without them colliding into mush.
+  const crowd = VN.length > 150 ? 0.45 : VN.length > 60 ? 0.7 : 1;
+  // Tree mode: one row per node with no overlap by construction, so every node
+  // must be labelled — a file tree with unnamed rows is useless.
+  const labelBudget = S.hier ? 4000
+    : Math.round((S.scale > 1.1 ? 400 : S.scale > 0.6 ? 200 : 90) * crowd);
+  const canLabel = true;
+  // Labels sit above the glow, so they get a dark halo of their own (three-layer
+  // shadow, same trick the atlas uses to keep star names legible over nebulae).
+  const labelHalo = light ? "rgba(255,255,255,.95)" : "rgba(3,4,10,.95)";
+  const claimed = [];   // occupied label boxes, world space
+  // Tree mode keeps document order (top-to-bottom); band mode labels the most
+  // important nodes first because collision detection drops the rest.
+  const ranked = !canLabel ? VN
+    : S.hier ? [...VN].sort((a, b) => a.y - b.y)
+    : [...VN].sort((a, b) => (b.importance || b.loc || 0) - (a.importance || a.loc || 0));
+  let labelsDrawn = 0;
+  for (const n of VN) {
+    if (n.x === undefined) continue;
+    const col = layerColor(n.layer);
+    const isMatch = matches(n);
+    const dim = (focus && !near.has(n.id)) || (S.query && !isMatch);
+    const inTour = tourNodes.has(n.id);
+
+    ctx.globalAlpha = dim ? 0.22 : 1;
+
+    if (S.cycles && cycleSet.has(n.id)) {
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r+6,0,7); 
+      ctx.strokeStyle="#f87171"; ctx.lineWidth=2/S.scale; ctx.stroke();
+    }
+    if (S.entries && n.isEntry) {
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r+4,0,7);
+      ctx.strokeStyle="#fbbf24"; ctx.lineWidth=2/S.scale; ctx.stroke();
+    }
+    if (isMatch || inTour) {
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.r+8,0,7);
+      ctx.fillStyle = inTour ? "#38bdf83a" : "#fbbf243a"; ctx.fill();
+    }
+
+    ctx.beginPath();
+    if (n.type === "module") {
+      const r = n.r;
+      ctx.roundRect ? ctx.roundRect(n.x-r, n.y-r*0.8, r*2, r*1.6, 5)
+                    : ctx.rect(n.x-r, n.y-r*0.8, r*2, r*1.6);
+    } else if (n.type === "external") {
+      ctx.moveTo(n.x, n.y-n.r); ctx.lineTo(n.x+n.r, n.y);
+      ctx.lineTo(n.x, n.y+n.r); ctx.lineTo(n.x-n.r, n.y); ctx.closePath();
+    } else {
+      ctx.arc(n.x, n.y, n.r, 0, 7);
+    }
+    ctx.fillStyle = col; ctx.fill();
+
+    if (n.id === S.selected) {
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.4/S.scale; ctx.stroke();
+    } else if (n.summary) {   /* enriched nodes get a subtle ring */
+      ctx.strokeStyle = "#ffffff55"; ctx.lineWidth = 1/S.scale; ctx.stroke();
+    }
+
+    // Collapsed level advertises how much is inside — the click affordance.
+    const hidden = S.hier ? hiddenChildCount(n) : 0;
+    if (hidden && S.scale > 0.3) {
+      const fs = Math.min(9 / S.scale, 24);
+      ctx.font = "600 " + fs + "px ui-monospace,'SF Mono',Menlo,monospace";
+      ctx.textAlign = "center";
+      const txt = "+" + hidden;
+      const w = txt.length * fs * 0.66;
+      const bx = n.x + n.r + w * 0.62, by = n.y - n.r * 0.55;
+      ctx.fillStyle = light ? "rgba(255,255,255,.94)" : "rgba(8,12,24,.92)";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(bx - w/2, by - fs*0.72, w, fs*1.4, fs*0.7);
+      else ctx.rect(bx - w/2, by - fs*0.72, w, fs*1.4);
+      ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 0.9/S.scale; ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.fillText(txt, bx, by + fs*0.28);
+    }
+
+    // A folded hub advertises what it is hiding, so nothing disappears silently.
+    if (isFoldedHub(n.id) && S.scale > 0.34) {
+      const deg = hubDegree.get(n.id) || 0;
+      const fs = Math.min(8.5 / S.scale, 22);
+      ctx.font = "600 " + fs + "px ui-monospace,'SF Mono',Menlo,monospace";
+      ctx.textAlign = "center";
+      const txt = "⋯" + deg;
+      const w = txt.length * fs * 0.62;
+      const bx = n.x, by = n.y - n.r - fs * 0.95;
+      ctx.fillStyle = light ? "rgba(255,255,255,.92)" : "rgba(8,12,24,.9)";
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(bx - w/2, by - fs*0.75, w, fs*1.45, fs*0.5);
+      else ctx.rect(bx - w/2, by - fs*0.75, w, fs*1.45);
+      ctx.fill();
+      ctx.strokeStyle = col; ctx.lineWidth = 0.8/S.scale; ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.fillText(txt, bx, by + fs*0.25);
+    }
+
+  }
+
+  /* labels: collision-avoided, importance-first, so dense graphs stay readable */
+  if (canLabel) {
+    ctx.textAlign = "center";
+    ctx.globalAlpha = 1;      // node loop may have left this dimmed
+    // Target a constant ~11.5px on screen regardless of zoom, so labels stay legible.
+    const fs = Math.min(11.5 / S.scale, 46);
+    const pad = 3 / S.scale;
+    for (const n of ranked) {
+      if (n.x === undefined) continue;
+      if (labelsDrawn >= labelBudget && n.id !== S.selected) continue;
+      const dim = (focus && !near.has(n.id)) || (S.query && !matches(n));
+      if (dim && n.id !== S.selected) continue;
+      const label = n.name.length > 26 ? n.name.slice(0,25)+"…" : n.name;
+      // Pad the claimed box so neighbouring labels keep visible air between them.
+      const w = label.length * fs * 0.52 + fs * 0.9, h = fs * 1.5;
+      // Tree mode: label sits to the RIGHT of the dot, so indentation reads as
+      // hierarchy. Band mode keeps labels centred beneath the node.
+      const tree = S.hier;
+      const cx = tree ? n.x + n.r + 6/S.scale + w/2 : n.x;
+      const cy = tree ? n.y + fs * 0.34 : n.y + n.r + 11/S.scale;
+      const box = [cx - w/2 - pad, cy - h, cx + w/2 + pad, cy + pad];
+      let clash = false;
+      // Tree rows are laid out non-overlapping already; running collision here
+      // would drop labels for no reason (long paths sit under short siblings).
+      if (!S.hier) {
+        for (const c of claimed) {
+          if (box[0] < c[2] && box[2] > c[0] && box[1] < c[3] && box[3] > c[1]) { clash = true; break; }
+        }
+      }
+      if (clash && n.id !== S.selected) continue;
+      claimed.push(box);
+      labelsDrawn++;
+      ctx.font = (n.type === "module" ? "650 " : "") + fs +
+                 "px ui-sans-serif,system-ui,sans-serif";
+      // Contrasting outline first so glyphs read against halos and bright edges.
+      // Stroke must scale with the FONT (fs), not the world, or it drowns the glyph.
+      ctx.lineWidth = fs * 0.30;
+      ctx.strokeStyle = labelHalo;
+      ctx.lineJoin = "round";
+      ctx.strokeText(label, cx, cy);
+      // Light theme needs near-black ink; the pale halo above would erase mid-greys.
+      ctx.fillStyle = light ? "#0b1020" : "#f2f5ff";
+      ctx.fillText(label, cx, cy);
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+/* ==================================================================== MOTION
+   Layered like a deep-field exposure:
+     1. starfield   — parallax dust, twinkling via sin(phase)
+     2. packets     — comet dots travelling source->target along each edge,
+                      with an exponential trail: intensity = exp(-k * distBehind)
+     3. halos       — breathing rings on entry points and the selected node
+   Everything lives on the #fx overlay so the static graph is never repainted.
+   Honors prefers-reduced-motion and the ⏸ button. */
+
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const M = {
+  on: !REDUCED,
+  t: 0,               // seconds
+  stars: [],
+  packets: [],
+  lastFrame: 0,
+  fps: 60,
+};
+
+/* ---- starfield: screen-space, cheap, subtly parallaxed by pan ---- */
+function buildStars() {
+  const count = Math.round(Math.min(190, (innerWidth * innerHeight) / 11000));
+  M.stars = [];
+  for (let i = 0; i < count; i++) {
+    const h = hash("star" + i), h2 = hash("star2" + i), h3 = hash("star3" + i);
+    M.stars.push({
+      x: h * innerWidth, y: h2 * innerHeight,
+      r: 0.4 + h3 * 1.25,
+      phase: h * 6.283, speed: 0.35 + h2 * 1.1,
+      depth: 0.03 + h3 * 0.09,          // parallax factor against pan
+      warm: h3 > 0.82,                   // a few warm dust motes
+    });
+  }
+}
+
+function drawStars(light) {
+  if (light) return;                     // the paper theme stays clean
+  const ox = S.tx, oy = S.ty;
+  // Keep dust off the glass panels so the chrome stays crisp.
+  const railR = 236, infoL = innerWidth - 346, topB = 58;
+  for (const s of M.stars) {
+    // exp-shaped twinkle, same shape the atlas uses in its star shader
+    const tw = 0.62 + 0.38 * Math.sin(M.t * s.speed + s.phase);
+    let x = (s.x + ox * s.depth) % innerWidth; if (x < 0) x += innerWidth;
+    let y = (s.y + oy * s.depth) % innerHeight; if (y < 0) y += innerHeight;
+    if (y > topB && (x < railR || (S.selected && x > infoL))) continue;
+    const a = tw * 0.5;
+    fctx.beginPath();
+    fctx.arc(x, y, s.r, 0, 7);
+    fctx.fillStyle = s.warm ? "rgba(201,138,75," + a + ")"
+                            : "rgba(190,210,255," + a + ")";
+    fctx.fill();
+    if (s.r > 1.25) {                    // brightest few get a soft bloom
+      const g = fctx.createRadialGradient(x, y, 0, x, y, s.r * 7);
+      g.addColorStop(0, "rgba(190,215,255," + (a * 0.3) + ")");
+      g.addColorStop(1, "rgba(190,215,255,0)");
+      fctx.fillStyle = g;
+      fctx.beginPath(); fctx.arc(x, y, s.r * 7, 0, 7); fctx.fill();
+    }
+  }
+}
+
+/* ---- packets: one travelling dot per interesting edge ---- */
+const PACKET_CAP = 190;          // hard ceiling: keeps 60fps on huge graphs
+
+function buildPackets() {
+  M.packets = [];
+  if (!VE.length) return;
+  // Prefer edges the reader is most likely to care about: the current focus,
+  // then the tour path, then the heaviest imports.
+  const focus = S.selected;
+  const tourIds = currentTourNodes();
+  const scored = VE.map(e => {
+    let w = 0;
+    const a = byId.get(e.source), b = byId.get(e.target);
+    if (!a || !b || a.x === undefined || b.x === undefined) return null;
+    if (e.type === "imports") w += 2;
+    if (e.type === "calls") w += 1.5;
+    if (focus && (e.source === focus || e.target === focus)) w += 40;
+    if (tourIds.has(e.source) && tourIds.has(e.target)) w += 30;
+    w += (a.importance || 0) + (b.importance || 0);
+    return { e, w, a, b };
+  }).filter(Boolean).sort((p, q) => q.w - p.w).slice(0, PACKET_CAP);
+
+  for (const { e, a, b } of scored) {
+    const seed = hash(e.source + ">" + e.target);
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    M.packets.push({
+      a, b, type: e.type,
+      // Deterministic offset so the field looks organic but is reproducible.
+      p: seed,
+      speed: (0.09 + hash("s" + e.source + e.target) * 0.07) * (260 / Math.max(dist, 90)),
+    });
+  }
+}
+
+function edgePoint(pk, t) {
+  // Mirror the static renderer's quadratic curve so dots ride their own line.
+  const { a, b } = pk;
+  const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 + Math.abs(b.x - a.x) * 0.055;
+  const u = 1 - t;
+  return {
+    x: u*u*a.x + 2*u*t*mx + t*t*b.x,
+    y: u*u*a.y + 2*u*t*my + t*t*b.y,
+  };
+}
+
+function drawPackets(light) {
+  const focus = S.selected || S.hover;
+  const near = focus ? neighborsOf(focus) : null;
+  const tourIds = currentTourNodes();
+  const TRAIL = 7;                          // samples behind the head
+
+  for (const pk of M.packets) {
+    const hot = tourIds.has(pk.a.id) && tourIds.has(pk.b.id);
+    const onFocus = focus && near.has(pk.a.id) && near.has(pk.b.id);
+    // When something is focused, unrelated traffic fades out of the way.
+    let strength = focus ? (onFocus ? 1 : 0.06) : 0.5;
+    if (hot) strength = 1;
+    if (strength < 0.08) continue;
+
+    const col = hot ? "255,217,138"
+              : pk.type === "calls" ? "201,140,255"
+              : light ? "37,99,235" : "142,200,255";
+
+    for (let i = TRAIL; i >= 0; i--) {
+      const t = pk.p - i * 0.021;
+      if (t < 0 || t > 1) continue;
+      const pt = edgePoint(pk, t);
+      // Exponential falloff behind the head — the comet-trail look.
+      const fall = Math.exp(-i * 0.42);
+      const a = fall * strength * (light ? 0.5 : 0.72);
+      const r = (i === 0 ? 2.5 : 1.9) * fall + 0.35;
+      if (i === 0) {                        // glowing head
+        const g = fctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, 13);
+        g.addColorStop(0, "rgba(" + col + "," + (a * 0.85) + ")");
+        g.addColorStop(1, "rgba(" + col + ",0)");
+        fctx.fillStyle = g;
+        fctx.beginPath(); fctx.arc(pt.x, pt.y, 13, 0, 7); fctx.fill();
+      }
+      fctx.beginPath();
+      fctx.arc(pt.x, pt.y, r, 0, 7);
+      fctx.fillStyle = "rgba(" + col + "," + a + ")";
+      fctx.fill();
+    }
+  }
+}
+
+/* ---- halos: breathing rings that mark what matters right now ---- */
+function drawHalos(light) {
+  const tourIds = currentTourNodes();
+  const breathe = 0.5 + 0.5 * Math.sin(M.t * 1.5);
+
+  // On paper the soft bloom is dropped entirely; only the crisp ring remains.
+  const fillA = light ? 0.0 : 1.0, strokeBoost = light ? 1.5 : 1.0;
+  const ring = (n, rgb, base, spread) => {
+    const r = n.r * S.scale;
+    const sx = n.x * S.scale + S.tx, sy = n.y * S.scale + S.ty;
+    if (sx < -60 || sy < -60 || sx > innerWidth + 60 || sy > innerHeight + 60) return;
+    const rad = r + base + breathe * spread;
+    // Ring only — a filled gradient would wash out the label sitting under it.
+    const g = fctx.createRadialGradient(sx, sy, r + 1, sx, sy, rad);
+    g.addColorStop(0, "rgba(" + rgb + ",0)");
+    g.addColorStop(0.5, "rgba(" + rgb + "," + ((0.10 + breathe * 0.10) * fillA) + ")");
+    g.addColorStop(1, "rgba(" + rgb + ",0)");
+    if (fillA) {
+      fctx.fillStyle = g;
+      fctx.beginPath(); fctx.arc(sx, sy, rad, 0, 7);
+      fctx.arc(sx, sy, r + 1, 0, 7, true);        // donut: leave the core clear
+      fctx.fill();
+    }
+    fctx.beginPath(); fctx.arc(sx, sy, rad * 0.8, 0, 7);
+    fctx.strokeStyle = "rgba(" + rgb + "," +
+      Math.min(0.85, (0.14 + breathe * 0.26) * strokeBoost) + ")";
+    fctx.lineWidth = light ? 1.4 : 1;
+    fctx.stroke();
+  };
+
+  for (const n of VN) {
+    if (n.x === undefined) continue;
+    // Light theme needs saturated ink, not glow: on paper a bloom reads as smudge.
+    if (tourIds.has(n.id)) ring(n, light ? "180,83,9" : "255,217,138", 12, 9);
+    else if (S.entries && n.isEntry) ring(n, light ? "190,24,93" : "244,114,182", 9, 7);
+    if (n.id === S.selected) ring(n, light ? "37,99,235" : "142,200,255", 15, 10);
+  }
+}
+
+/* ---- the loop: overlay only, so cost is independent of graph size ---- */
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - M.lastFrame) / 1000 || 0.016);
+  M.lastFrame = now;
+
+  fctx.clearRect(0, 0, innerWidth, innerHeight);
+  if (!M.on) return;
+
+  M.t += dt;
+  const light = document.documentElement.dataset.theme === "light";
+  fctx.globalCompositeOperation = light ? "source-over" : "lighter";
+  drawStars(light);
+  for (const pk of M.packets) {
+    pk.p += pk.speed * dt;
+    if (pk.p > 1) pk.p -= 1 + hash("r" + pk.a.id) * 0.35;  // staggered respawn
+  }
+  drawPackets(light);
+  drawHalos(light);
+  fctx.globalCompositeOperation = "source-over";
+
+  // Flowing edges and their relationship labels are drawn here, not on the base
+  // canvas, so animation never triggers a full-graph repaint. Cost is bounded by
+  // the focused node's degree instead of the total node count.
+  if (S.mode === "explore") drawLiveEdges(light);
+  // The star map has its own canvas and its own breathing/twinkle clock.
+  if (S.mode === "star") { SKY.t += dt; skyTick(dt); drawSky(); }
+}
+
+function setMotion(on) {
+  M.on = on;
+  document.getElementById("bMotion").classList.toggle("on", on);
+  document.getElementById("bMotion").textContent = on ? "⏸" : "▶";
+  if (!on) {
+    fctx.clearRect(0, 0, innerWidth, innerHeight);
+    draw();                    // settle the dashes back to a static pattern
+  }
+  // The overview animates via CSS/SMIL, so pause it at the document level too.
+  const ov = document.getElementById("ov");
+  ov.style.setProperty("--play", on ? "running" : "paused");
+  ov.classList.toggle("paused", !on);
+  const svg = document.getElementById("ovSvg");
+  if (svg) { try { on ? svg.unpauseAnimations() : svg.pauseAnimations(); } catch (e) {} }
+}
+
+/* ================================================================== OVERVIEW
+   The glowmotion half: a small, authored-looking architecture diagram built
+   from overview.py's geometry. Crisp SVG so text stays sharp at any zoom;
+   dash-flow + SMIL comets so it animates with no per-frame JS cost.
+   Clicking a module hands off to the explore view, focused on that module. */
+
+const OV = G.overview || null;
+const svgNS = "http://www.w3.org/2000/svg";
+const el = (n, a) => {
+  const e = document.createElementNS(svgNS, n);
+  for (const k in (a || {})) e.setAttribute(k, a[k]);
+  return e;
+};
+
+function buildOverview() {
+  const host = document.getElementById("ovScroll");
+  if (!OV || !OV.boxes.length) {
+    host.innerHTML = '<div style="color:var(--fg3);font-size:12px;letter-spacing:.16em">' +
+      'No overview available for this graph.</div>';
+    return;
+  }
+  const W = OV.width, H = OV.height;
+  const svg = el("svg", {
+    id: "ovSvg", viewBox: "0 0 " + W + " " + H,
+    width: W, height: H, role: "img",
+    "aria-label": "Architecture overview of " + (G.project || {}).name,
+  });
+
+  // --- rows as faint bands, labelled on the left
+  const bands = el("g", {});
+  let lastLabel = null;
+  for (const r of OV.rows) {
+    const rowBoxes = OV.boxes.filter(b => b.row === r.row);
+    if (!rowBoxes.length) continue;
+    // A tier that wrapped onto a second row shouldn't repeat its heading.
+    const repeat = r.label === lastLabel;
+    lastLabel = r.label;
+    const h = Math.max(...rowBoxes.map(b => b.h));
+    const color = layerColor(r.layer);
+    const g = el("g", { color: color });
+    g.appendChild(el("rect", {
+      class: "ov-band", x: 8, y: r.y - 12, width: W - 16, height: h + 24, rx: 10,
+    }));
+    // Label above the band so it can never sit on top of a box.
+    if (!repeat) {
+      const t = el("text", { class: "ov-bandlabel", x: 14, y: r.y - 19 });
+      t.textContent = r.label;
+      g.appendChild(t);
+    }
+    bands.appendChild(g);
+  }
+  svg.appendChild(bands);
+
+  // --- connectors. The journey path is drawn last so it sits on top.
+  const journeyEdges = new Set(OV.journey.map(h => h[0] + ">" + h[1]));
+  const links = el("g", {});
+  const maxW = Math.max(1, ...OV.edges.map(e => e.weight));
+  for (const e of OV.edges) {
+    const onPath = journeyEdges.has(e.from + ">" + e.to);
+    const cls = "ov-link" + (onPath ? " path" : (e.weight > maxW * 0.35 ? " heavy" : ""));
+    const p = el("path", { class: cls, d: e.d, "data-from": e.from, "data-to": e.to });
+    if (!onPath) p.style.animationDelay = (hash(e.from + e.to) * -1.1) + "s";
+    links.appendChild(p);
+    // arrowhead at the target end, oriented by the final segment
+    const head = arrowAt(e.d, onPath);
+    if (head) links.appendChild(head);
+  }
+  svg.appendChild(links);
+
+  // --- module boxes
+  const boxes = el("g", {});
+  for (const b of OV.boxes) {
+    const color = layerColor(b.layer);
+    const g = el("g", { class: "ov-box", color: color, "data-mod": b.id,
+                        tabindex: "0", role: "button",
+                        "aria-label": b.path + ", " + b.fileCount + " files" });
+    g.appendChild(el("rect", { x: b.x, y: b.y, width: b.w, height: b.h, rx: 9 }));
+    const name = el("text", { class: "ov-name", x: b.x + 12, y: b.y + 24 });
+    name.textContent = b.label;
+    g.appendChild(name);
+    const meta = el("text", { class: "ov-meta", x: b.x + 12, y: b.y + 40 });
+    meta.textContent = b.fileCount + " files · " + b.loc.toLocaleString() + " loc" +
+                       (b.lang ? " · " + b.lang : "");
+    g.appendChild(meta);
+    // Show the entry marker only when entry points DOMINATE the module. A badge
+    // reading "entry" on a 12-file API package because 5 files match the
+    // heuristic is misleading — it made every box in a FastAPI app look like one.
+    if (b.entries && b.entries >= Math.max(2, b.fileCount * 0.5)) {
+      const badge = el("text", { class: "ov-badge", x: b.x + 12, y: b.y + 54 });
+      badge.textContent = b.entries + " entry point" + (b.entries > 1 ? "s" : "");
+      g.appendChild(badge);
+    } else if (b.tags && b.tags.length) {
+      const badge = el("text", { class: "ov-badge", x: b.x + 12, y: b.y + 54 });
+      badge.textContent = b.tags.slice(0, 2).join(" · ");
+      g.appendChild(badge);
+    }
+    // pulsing halo on the journey's own modules
+    if (OV.journey.some(h => h[0] === b.id || h[1] === b.id)) {
+      const halo = el("rect", { class: "ov-halo", x: b.x - 4, y: b.y - 4,
+                                width: b.w + 8, height: b.h + 8, rx: 12 });
+      halo.style.animationDelay = (OV.journey.findIndex(h => h[0] === b.id) * 0.35) + "s";
+      g.appendChild(halo);
+    }
+    g.addEventListener("click", () => drillInto(b.id));
+    g.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); drillInto(b.id); }
+    });
+    g.addEventListener("mouseenter", ev => ovTip(ev, b));
+    g.addEventListener("mouseleave", () => { document.getElementById("tip").style.display = "none"; });
+    boxes.appendChild(g);
+  }
+  svg.appendChild(boxes);
+
+  // --- the comet: one dot per journey hop, riding the exact connector path
+  const byPair = new Map(OV.edges.map(e => [e.from + ">" + e.to, e]));
+  const comets = el("g", {});
+  OV.journey.forEach((hop, i) => {
+    const e = byPair.get(hop[0] + ">" + hop[1]);
+    if (!e) return;
+    const dur = 1.5, begin = (i * dur / Math.max(1, OV.journey.length)).toFixed(2);
+    for (let t = 0; t < 3; t++) {          // head + two fading trail dots
+      const dot = el("circle", { class: t === 0 ? "ov-comet" : "ov-trail",
+                                 r: t === 0 ? 3.4 : (3.4 - t * 0.9) });
+      if (t) dot.setAttribute("opacity", 0.42 / t);
+      const mo = el("animateMotion", {
+        dur: dur + "s", repeatCount: "indefinite", path: e.d,
+        begin: (parseFloat(begin) + t * 0.055).toFixed(3) + "s",
+        calcMode: "linear", fill: "freeze",
+      });
+      dot.appendChild(mo);
+      comets.appendChild(dot);
+    }
+  });
+  svg.appendChild(comets);
+
+  host.innerHTML = "";
+  host.appendChild(svg);
+  const hint = document.createElement("div");
+  hint.id = "ovHint";
+  const p = G.project || {};
+  // Prefer the agent's description, but never cut it mid-sentence.
+  let blurb = (p.description || "").trim();
+  if (blurb.length > 190) {
+    const cut = blurb.lastIndexOf(". ", 190);
+    blurb = cut > 60 ? blurb.slice(0, cut + 1) : blurb.slice(0, 190).trim() + "…";
+  }
+  const facts = OV.boxes.length + " of " + (G.stats || {}).files_indexed +
+    " files, grouped by module · " + (p.languages || []).slice(0, 3).join(" · ");
+  hint.textContent = blurb || facts;
+  hint.title = facts;
+  host.appendChild(hint);
+}
+
+/* ================================================================== STAR MAP
+   The same modules, read as MASS rather than layers: each module is a galaxy,
+   each file a star whose brightness is its importance. Answers a different
+   question from the box overview — "where is the weight of this system?"
+
+   Star shading is ported from Physics-atlas' GLSL to Canvas 2D:
+     white-hot core   exp(-r^2 * 42)
+     two-layer halo   exp(-r*3.2)*0.55 + exp(-r*8)*0.5
+     diffraction spikes, only for the biggest stars
+   Canvas (not WebGL) keeps the single-file, zero-dependency contract. */
+
+const SM = G.overview && G.overview.starmap ? G.overview.starmap : null;
+const sky = document.getElementById("sky");
+const skyCv = document.getElementById("skyCv");
+const sctx = skyCv ? skyCv.getContext("2d") : null;
+
+/* Orbit camera over the galactic disc. Mirrors Physics-atlas' OrbitControls
+   contract — drag to rotate, wheel to dolly, damped inertia, slow auto-rotate
+   when idle — but as a 2D projection so we keep the zero-dependency, single-file
+   output. No three.js (~600KB) and no WebGL context needed. */
+const SKY = {
+  hover: null, t: 0, fit: 1, ox: 0, oy: 0, dust: [],
+  yaw: 0.5, pitch: 0.62,          // radians; pitch 0 = edge-on, PI/2 = top-down
+  vYaw: 0, vPitch: 0,             // angular velocity for the damped glide
+  zoom: 1, zoomTo: 1,             // dolly is smoothed, like the atlas' rig
+  panX: 0, panY: 0,
+  auto: 0.16,                     // idle auto-rotate speed (atlas uses 0.16)
+  idle: 0, drag: null,
+};
+const PITCH_MIN = 0.12, PITCH_MAX = 1.45;   // never fully edge-on or flat
+
+function skyResize() {
+  if (!sctx) return;
+  const w = sky.clientWidth, h = sky.clientHeight;
+  skyCv.width = w * DPR; skyCv.height = h * DPR;
+  sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  SKY.fit = Math.min(w / SM.width, h / SM.height) * 0.92;
+  SKY.ox = w / 2;
+  SKY.oy = h / 2;
+  if (!SKY.dust.length) {
+    const n = Math.round(Math.min(320, (w * h) / 5200));
+    for (let i = 0; i < n; i++) {
+      const a = hash("d" + i), b = hash("d2" + i), c = hash("d3" + i);
+      SKY.dust.push({ x: a * w, y: b * h, r: 0.3 + c * 0.9,
+                      ph: a * 6.283, sp: 0.3 + b * 0.9, warm: c > 0.85 });
+    }
+  }
+}
+
+/**
+ * Project a disc point to screen space.
+ * The field is modelled as a plane in XZ with Y as height; yaw spins it, pitch
+ * tilts it toward the viewer. Returns a depth term too, so callers can scale and
+ * fade by distance — that is what sells the third dimension without WebGL.
+ */
+function project(x, y, z) {
+  const cx = SM.width / 2, cy = SM.height / 2;
+  // Disc-local coords, centred.
+  const dx = x - cx, dz = y - cy, dy = (z || 0);
+  const cy_ = Math.cos(SKY.yaw), sy_ = Math.sin(SKY.yaw);
+  // yaw about the vertical axis
+  const rx = dx * cy_ - dz * sy_;
+  const rz = dx * sy_ + dz * cy_;
+  const cp = Math.cos(SKY.pitch), sp = Math.sin(SKY.pitch);
+  // pitch: tilt the plane, height contributes to screen Y
+  const sxp = rx;
+  const syp = rz * sp - dy * cp;
+  const depth = rz * cp + dy * sp;          // + = further away
+  // Weak perspective: enough to read depth, not enough to distort the field.
+  const persp = 1 / (1 + depth / 2400);
+  const s = SKY.fit * SKY.zoom * persp;
+  return {
+    x: SKY.ox + sxp * s + SKY.panX,
+    y: SKY.oy + syp * s + SKY.panY,
+    s: s, depth: depth, persp: persp,
+  };
+}
+
+/** One star, atlas-style: hot core, soft double halo, spikes when massive. */
+function paintStar(x, y, size, rgb, mag, spike) {
+  const outer = size * 4.2;
+  const g = sctx.createRadialGradient(x, y, 0, x, y, outer);
+  // Sampling the analytic falloff at a few stops is visually identical to the
+  // shader and far cheaper than per-pixel work in 2D.
+  g.addColorStop(0.00, "rgba(255,253,247," + (0.95 * mag) + ")");
+  g.addColorStop(0.10, "rgba(" + rgb + "," + (0.85 * mag) + ")");
+  g.addColorStop(0.30, "rgba(" + rgb + "," + (0.34 * mag) + ")");
+  g.addColorStop(0.60, "rgba(" + rgb + "," + (0.10 * mag) + ")");
+  g.addColorStop(1.00, "rgba(" + rgb + ",0)");
+  sctx.fillStyle = g;
+  sctx.beginPath(); sctx.arc(x, y, outer, 0, 7); sctx.fill();
+
+  if (spike > 0.02) {                     // diffraction cross for giants only
+    const len = size * (5 + spike * 9), a = 0.30 * spike * mag;
+    const lg = sctx.createLinearGradient(x - len, y, x + len, y);
+    lg.addColorStop(0, "rgba(" + rgb + ",0)");
+    lg.addColorStop(0.5, "rgba(255,255,255," + a + ")");
+    lg.addColorStop(1, "rgba(" + rgb + ",0)");
+    sctx.fillStyle = lg;
+    sctx.fillRect(x - len, y - size * 0.10, len * 2, size * 0.20);
+    const vg = sctx.createLinearGradient(x, y - len, x, y + len);
+    vg.addColorStop(0, "rgba(" + rgb + ",0)");
+    vg.addColorStop(0.5, "rgba(255,255,255," + a + ")");
+    vg.addColorStop(1, "rgba(" + rgb + ",0)");
+    sctx.fillStyle = vg;
+    sctx.fillRect(x - size * 0.10, y - len, size * 0.20, len * 2);
+  }
+}
+
+function rgbOf(layer) {
+  // "other" renders grey, which made the single most important module (a flat
+  // src/ root) the dullest thing on screen — the opposite of what the map claims.
+  const hex = layer === "other" || !layer ? "#a9b8e8" : layerColor(layer);
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m ? [parseInt(m[1],16), parseInt(m[2],16), parseInt(m[3],16)].join(",")
+           : "160,190,255";
+}
+
+function drawSky() {
+  if (!sctx || !SM) return;
+  const light = document.documentElement.dataset.theme === "light";
+  const w = sky.clientWidth, h = sky.clientHeight;
+  sctx.clearRect(0, 0, w, h);
+  sctx.globalCompositeOperation = light ? "source-over" : "lighter";
+
+  // background dust
+  if (!light) {
+    for (const d of SKY.dust) {
+      const tw = 0.55 + 0.45 * Math.sin(SKY.t * d.sp + d.ph);
+      sctx.fillStyle = (d.warm ? "rgba(201,138,75," : "rgba(190,210,255,") +
+                       (tw * 0.42) + ")";
+      sctx.beginPath(); sctx.arc(d.x, d.y, d.r, 0, 7); sctx.fill();
+    }
+  }
+
+  // Everything is projected once per frame, then painted far-to-near so nearer
+  // stars correctly overlap the ones behind them.
+  const gp = new Map();
+  for (const g2 of SM.galaxies) {
+    const p = project(g2.x, g2.y, g2.z);
+    p.g = g2;                    // attach after projecting, never spread over it
+    gp.set(g2.id, p);
+  }
+
+  // filaments between galaxies — the module dependencies
+  const maxW = Math.max(1, ...SM.links.map(l => l.weight));
+  for (const l of SM.links) {
+    const a = gp.get(l.from), b = gp.get(l.to);
+    if (!a || !b) continue;
+    const rel = l.weight / maxW;
+    const hot = SKY.hover && (SKY.hover === l.from || SKY.hover === l.to);
+    // Far filaments fade, which is what stops the field looking like flat spaghetti.
+    const near = Math.max(0.25, (a.persp + b.persp) / 2);
+    sctx.strokeStyle = light
+      ? "rgba(70,95,150," + ((0.10 + rel * 0.30 + (hot ? 0.35 : 0)) * near) + ")"
+      : "rgba(150,185,255," + ((0.05 + rel * 0.22 + (hot ? 0.40 : 0)) * near) + ")";
+    sctx.lineWidth = (0.5 + rel * 1.6 + (hot ? 0.9 : 0)) * near;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const nlen = Math.hypot(dx, dy) || 1;
+    const bow = Math.min(46, nlen * 0.14);
+    sctx.beginPath();
+    sctx.moveTo(a.x, a.y);
+    sctx.quadraticCurveTo(mx - dy / nlen * bow, my + dx / nlen * bow, b.x, b.y);
+    sctx.stroke();
+  }
+
+  // nebula wash per galaxy
+  const galByDepth = [...gp.values()].sort((p, q) => q.depth - p.depth);
+  for (const p of galByDepth) {
+    const g2 = p.g;
+    const rgb = rgbOf(g2.layer);
+    const r = g2.r * p.s;
+    const dim = (SKY.hover && SKY.hover !== g2.id ? 0.30 : 1) * Math.max(0.35, p.persp);
+    const neb = sctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 1.9);
+    neb.addColorStop(0, "rgba(" + rgb + "," + (light ? 0.10 : 0.13) * dim + ")");
+    neb.addColorStop(0.55, "rgba(" + rgb + "," + (light ? 0.05 : 0.05) * dim + ")");
+    neb.addColorStop(1, "rgba(" + rgb + ",0)");
+    sctx.fillStyle = neb;
+    sctx.beginPath(); sctx.arc(p.x, p.y, r * 1.9, 0, 7); sctx.fill();
+  }
+
+  // stars, far to near. NOTE: project() returns a field named `s` (scale), so the
+  // star object is carried as `star` — spreading it as `s` silently shadowed the id.
+  const proj = SM.stars.map(st => {
+    const p = project(st.x, st.y, st.z);
+    p.star = st;
+    return p;
+  });
+  proj.sort((a, b) => b.depth - a.depth);
+  for (const p of proj) {
+    const st = p.star;
+    const dim = (SKY.hover && SKY.hover !== st.mod ? 0.22 : 1) * Math.max(0.30, p.persp);
+    // breathing, small amplitude like the atlas — presence, not blinking
+    const puls = 1 + 0.05 * Math.sin(SKY.t * 1.25 + hash(st.id) * 6.283);
+    const size = (1.5 + st.mag * 5.2) * puls * Math.max(0.6, p.s);
+    paintStar(p.x, p.y, size, rgbOf(st.layer),
+              (light ? 0.55 : 1) * dim * (0.35 + st.mag * 0.65),
+              Math.max(0, st.mag - 0.62) * 2.2);
+  }
+
+  // galaxy labels last so they sit on top of the glow
+  sctx.globalCompositeOperation = "source-over";
+  sctx.textAlign = "center";
+  // Biggest galaxies get a heavier label: on a crowded field the eye needs a
+  // ranking, and LOC is the honest proxy for "how much lives here".
+  const maxLoc = Math.max(1, ...SM.galaxies.map(g2 => g2.loc));
+  for (const p of galByDepth) {
+    const g2 = p.g;
+    const x = p.x, y = p.y + g2.r * p.s + 15;
+    const focus = SKY.hover === g2.id;
+    const dim = (SKY.hover && !focus ? 0.35 : 1) * Math.max(0.4, p.persp);
+    const major = g2.loc > maxLoc * 0.35;
+    sctx.font = (focus || major ? "600 " : "") + (focus ? 12.5 : major ? 11.5 : 10) +
+                "px ui-sans-serif,system-ui,sans-serif";
+    const txt = g2.label;
+    sctx.lineWidth = 3.2;
+    sctx.strokeStyle = light ? "rgba(255,255,255,.95)" : "rgba(3,4,10,.95)";
+    sctx.lineJoin = "round";
+    sctx.globalAlpha = dim;
+    sctx.strokeText(txt, x, y);
+    sctx.fillStyle = light ? "#141a2c" : "#eaf0ff";
+    sctx.fillText(txt, x, y);
+    if (focus) {
+      sctx.font = "9.5px ui-monospace,'SF Mono',Menlo,monospace";
+      sctx.fillStyle = light ? "rgba(20,26,44,.7)" : "rgba(220,232,255,.7)";
+      sctx.fillText(g2.files + " files · " + g2.loc.toLocaleString() + " loc", x, y + 14);
+    }
+    sctx.globalAlpha = 1;
+  }
+}
+
+/** Which galaxy is under the pointer? */
+function skyHit(px, py) {
+  if (!SM) return null;
+  let best = null, bd = 1e9;
+  for (const g2 of SM.galaxies) {
+    const p = project(g2.x, g2.y, g2.z);
+    const d = Math.hypot(p.x - px, p.y - py);
+    // Nearer galaxies win ties: they are the ones visually on top.
+    if (d < g2.r * p.s * 1.25 && d - p.depth * 0.02 < bd) {
+      bd = d - p.depth * 0.02; best = g2;
+    }
+  }
+  return best;
+}
+
+/** Damped camera integration, run once per frame from the animation loop. */
+function skyTick(dt) {
+  // Auto-rotate only after the reader has been still for a moment — motion that
+  // fights your hand is worse than no motion.
+  SKY.idle += dt;
+  if (!SKY.drag && SKY.idle > 2.5 && !SKY.hover) {
+    SKY.yaw += SKY.auto * dt * 0.35;
+  }
+  // Inertia: keep gliding after release, then settle (atlas dampingFactor .055).
+  if (!SKY.drag) {
+    SKY.yaw += SKY.vYaw * dt;
+    SKY.pitch += SKY.vPitch * dt;
+    const k = Math.pow(0.0025, dt);        // frame-rate independent decay
+    SKY.vYaw *= k; SKY.vPitch *= k;
+    if (Math.abs(SKY.vYaw) < 1e-4) SKY.vYaw = 0;
+    if (Math.abs(SKY.vPitch) < 1e-4) SKY.vPitch = 0;
+  }
+  SKY.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, SKY.pitch));
+  // Smooth dolly toward the wheel target rather than snapping.
+  SKY.zoom += (SKY.zoomTo - SKY.zoom) * Math.min(1, dt * 9);
+}
+
+function skyReset() {
+  SKY.yaw = 0.5; SKY.pitch = 0.62; SKY.zoomTo = SKY.zoom = 1;
+  SKY.panX = SKY.panY = 0; SKY.vYaw = SKY.vPitch = 0; SKY.idle = 0;
+  drawSky();
+}
+
+if (skyCv) {
+  const local = ev => [ev.clientX, ev.clientY - 56];
+
+  skyCv.addEventListener("mousedown", ev => {
+    ev.preventDefault();
+    SKY.drag = { x: ev.clientX, y: ev.clientY, yaw: SKY.yaw, pitch: SKY.pitch,
+                 panX: SKY.panX, panY: SKY.panY, moved: false,
+                 pan: ev.button === 2 || ev.shiftKey, lx: ev.clientX, ly: ev.clientY };
+    SKY.vYaw = SKY.vPitch = 0;
+    skyCv.style.cursor = "grabbing";
+  });
+  skyCv.addEventListener("contextmenu", ev => ev.preventDefault());
+
+  addEventListener("mousemove", ev => {
+    if (SKY.drag) {
+      const d = SKY.drag;
+      const dx = ev.clientX - d.x, dy = ev.clientY - d.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) d.moved = true;
+      if (d.pan) {                          // shift/right-drag pans the field
+        SKY.panX = d.panX + dx;
+        SKY.panY = d.panY + dy;
+      } else {
+        SKY.yaw = d.yaw - dx * 0.005;
+        SKY.pitch = d.pitch + dy * 0.005;
+        // Velocity from the last mouse delta feeds the release glide.
+        SKY.vYaw = -(ev.clientX - d.lx) * 0.30;
+        SKY.vPitch = (ev.clientY - d.ly) * 0.30;
+      }
+      d.lx = ev.clientX; d.ly = ev.clientY;
+      SKY.idle = 0;
+      drawSky();
+      return;
+    }
+    if (S.mode !== "star") return;
+    const [px, py] = local(ev);
+    const g2 = skyHit(px, py);
+    const id = g2 ? g2.id : null;
+    if (id !== SKY.hover) { SKY.hover = id; SKY.idle = 0; drawSky(); }
+    const tip = document.getElementById("tip");
+    if (g2) {
+      tip.style.display = "block";
+      tip.style.left = Math.min(ev.clientX + 14, innerWidth - 380) + "px";
+      tip.style.top = (ev.clientY + 16) + "px";
+      tip.textContent = g2.label + "  ·  " + g2.files + " files" +
+        (g2.summary ? "  —  " + g2.summary.slice(0, 130) : "");
+    } else tip.style.display = "none";
+  });
+
+  addEventListener("mouseup", ev => {
+    if (!SKY.drag) return;
+    const moved = SKY.drag.moved;
+    SKY.drag = null;
+    skyCv.style.cursor = "grab";
+    // A click (not a drag) on a galaxy still drills into explore.
+    if (!moved && S.mode === "star") {
+      const [px, py] = local(ev);
+      const g2 = skyHit(px, py);
+      if (g2) drillInto(g2.id);
+    }
+  });
+
+  skyCv.addEventListener("wheel", ev => {
+    ev.preventDefault();
+    SKY.zoomTo = Math.max(0.35, Math.min(6, SKY.zoomTo * Math.exp(-ev.deltaY * 0.0016)));
+    SKY.idle = 0;
+  }, { passive: false });
+
+  skyCv.addEventListener("mouseleave", () => {
+    if (SKY.drag) return;
+    SKY.hover = null; document.getElementById("tip").style.display = "none"; drawSky();
+  });
+
+  // Touch: one finger orbits, two pinch-zoom.
+  let pinch = 0;
+  skyCv.addEventListener("touchstart", ev => {
+    if (ev.touches.length === 1) {
+      const t0 = ev.touches[0];
+      SKY.drag = { x: t0.clientX, y: t0.clientY, yaw: SKY.yaw, pitch: SKY.pitch,
+                   panX: SKY.panX, panY: SKY.panY, moved: false, pan: false,
+                   lx: t0.clientX, ly: t0.clientY };
+    } else if (ev.touches.length === 2) {
+      pinch = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX,
+                         ev.touches[0].clientY - ev.touches[1].clientY);
+    }
+  }, { passive: true });
+  skyCv.addEventListener("touchmove", ev => {
+    if (ev.touches.length === 2 && pinch) {
+      const d = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX,
+                           ev.touches[0].clientY - ev.touches[1].clientY);
+      SKY.zoomTo = Math.max(0.35, Math.min(6, SKY.zoomTo * (d / pinch)));
+      pinch = d;
+      SKY.idle = 0;
+      ev.preventDefault();
+      return;
+    }
+    if (SKY.drag && ev.touches.length === 1) {
+      const t0 = ev.touches[0], d = SKY.drag;
+      SKY.yaw = d.yaw - (t0.clientX - d.x) * 0.005;
+      SKY.pitch = d.pitch + (t0.clientY - d.y) * 0.005;
+      SKY.idle = 0;
+      ev.preventDefault();
+      drawSky();
+    }
+  }, { passive: false });
+  skyCv.addEventListener("touchend", () => { SKY.drag = null; pinch = 0; }, { passive: true });
+}
+
+/** Arrowhead marker built from the last segment of an orthogonal path. */
+function arrowAt(d, onPath) {
+  const pts = d.match(/-?\d+(\.\d+)?/g);
+  if (!pts || pts.length < 4) return null;
+  const n = pts.map(Number);
+  const x2 = n[n.length - 2], y2 = n[n.length - 1];
+  const x1 = n[n.length - 4], y1 = n[n.length - 3];
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const s = 4.6;
+  const p1 = [x2, y2];
+  const p2 = [x2 - Math.cos(ang - 0.45) * s, y2 - Math.sin(ang - 0.45) * s];
+  const p3 = [x2 - Math.cos(ang + 0.45) * s, y2 - Math.sin(ang + 0.45) * s];
+  return el("polygon", {
+    class: "ov-arrow" + (onPath ? " path" : ""),
+    points: [p1, p2, p3].map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" "),
+  });
+}
+
+function ovTip(ev, b) {
+  const tip = document.getElementById("tip");
+  tip.style.display = "block";
+  tip.style.left = Math.min(ev.clientX + 14, innerWidth - 380) + "px";
+  tip.style.top = (ev.clientY + 16) + "px";
+  tip.textContent = b.path + (b.summary ? "  —  " + b.summary.slice(0, 150) : "");
+}
+
+/* ---- the handoff that makes this one tool instead of two ---- */
+function drillInto(modId) {
+  setMode("explore");
+  S.view = "file";
+  const box = OV.boxes.find(b => b.id === modId);
+  if (box) S.hiddenLayers.delete(box.layer);
+  // In hierarchy mode the target must be un-collapsed before it can be framed.
+  if (S.hier) openTo(modId);
+  syncUI();
+  rebuild();
+  document.querySelectorAll("[data-layer]").forEach(e2 =>
+    e2.classList.toggle("off", S.hiddenLayers.has(e2.dataset.layer)));
+
+  // Frame the module's FILES rather than the module box: a file has real
+  // import edges to inspect, and a group of them fills the viewport sensibly.
+  const kids = (childrenOf.get(modId) || []).map(k => byId.get(k))
+    .filter(n => n && n.x !== undefined);
+  if (!kids.length) { if (byId.has(modId)) focusNode(modId); return; }
+
+  frameNodes(kids);
+  const lead = kids.slice().sort((a, b) => (b.importance || 0) - (a.importance || 0))[0];
+  select(lead.id);
+  buildPackets();
+}
+
+/**
+ * Build a self-contained question about a node and put it on the clipboard.
+ * The artifact is offline and holds no API key, so rather than pretend to host a
+ * chat we hand you a prompt that already carries the graph facts an LLM would
+ * otherwise have to guess: path, summary, both edge directions, symbols.
+ */
+function copyAskContext(n) {
+  const outs = (adjOut.get(n.id) || []), ins = (adjIn.get(n.id) || []);
+  const nameOf = id => (byId.get(id) || {}).filePath || (byId.get(id) || {}).name || id;
+  const L = [];
+  L.push("I am reading the codebase `" + ((G.project || {}).name || "?") + "`" +
+         ((G.project || {}).languages ? " (" + G.project.languages.slice(0, 3).join(", ") + ")" : "") + ".");
+  L.push("");
+  L.push("Question: what does this do, why does it exist, and what should I know before changing it?");
+  L.push("");
+  L.push("## " + (n.filePath || n.name));
+  if (n.summary) L.push("Summary" + (n.summarySource === "docstring" ? " (its own docstring)" : "") +
+                        ": " + n.summary);
+  const facts = [];
+  if (n.loc) facts.push(n.loc + " LOC");
+  if (n.layer) facts.push("layer: " + n.layer);
+  if (n.fanIn !== undefined) facts.push("imported by " + n.fanIn);
+  if (n.fanOut !== undefined) facts.push("imports " + n.fanOut);
+  if (n.importance !== undefined) facts.push("importance " + n.importance);
+  if (facts.length) L.push("Facts: " + facts.join(" · "));
+  if (n.routes && n.routes.length) L.push("HTTP routes: " + n.routes.join(", "));
+  if (n.symbols && n.symbols.length) L.push("Defines: " + n.symbols.join(", "));
+  if (outs.length) L.push("Depends on: " +
+    outs.slice(0, 14).map(e => nameOf(e.target)).join(", "));
+  if (ins.length) L.push("Used by: " +
+    ins.slice(0, 14).map(e => nameOf(e.source)).join(", "));
+  const text = L.join("\n");
+
+  const done = ok => {
+    const b = document.querySelector("[data-ask]");
+    if (!b) return;
+    b.textContent = ok ? "copied ✓" : "copy failed";
+    setTimeout(() => { b.textContent = "ask ▸"; }, 1600);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => done(true), () => done(false));
+  } else {                                   // file:// fallback
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    done(ok);
+  }
+}
+
+/** Fit the viewport around a set of nodes, with padding for the side panels. */
+function frameNodes(list) {
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (const n of list) {
+    x0 = Math.min(x0, n.x - n.r); x1 = Math.max(x1, n.x + n.r);
+    y0 = Math.min(y0, n.y - n.r); y1 = Math.max(y1, n.y + n.r);
+  }
+  const padL = 250, padR = 360, padT = 90, padB = 110, margin = 90;
+  const w = (x1 - x0) + margin * 2 || 1, h = (y1 - y0) + margin * 2 || 1;
+  S.scale = Math.max(0.12, Math.min(1.7,
+    Math.min((innerWidth - padL - padR) / w, (innerHeight - padT - padB) / h)));
+  S.tx = padL + (innerWidth - padL - padR) / 2 - (x0 + x1) / 2 * S.scale;
+  S.ty = padT + (innerHeight - padT - padB) / 2 - (y0 + y1) / 2 * S.scale;
+  draw();
+}
+
+function setMode(m) {
+  if (m === "star" && !SM) m = "overview";     // no star data: degrade gracefully
+  S.mode = m;
+  const isOv = m === "overview", isSky = m === "star", isEx = m === "explore";
+  document.getElementById("ov").classList.toggle("show", isOv);
+  document.getElementById("ovLegend").classList.toggle("show", isOv);
+  if (sky) sky.classList.toggle("show", isSky);
+  document.getElementById("stage").style.display = isEx ? "block" : "none";
+  document.getElementById("mOverview").classList.toggle("on", isOv);
+  document.getElementById("mStar").classList.toggle("on", isSky);
+  document.getElementById("mExplore").classList.toggle("on", isEx);
+  // Controls that only mean something in the explore view.
+  for (const id of ["view", "bImports", "bCalls", "bExt", "bEntry", "bCycles", "bFit",
+                    "bFold", "bHood", "bHier"]) {
+    const b = document.getElementById(id);
+    if (b) b.style.display = isEx ? "" : "none";
+  }
+  document.getElementById("rail").style.display = isEx ? "" : "none";
+  if (!isEx) {
+    select(null);
+    document.getElementById("tip").style.display = "none";
+    if (S.tourIdx >= 0) closeTour();   // a tour has no meaning without the graph
+  }
+  else if (!VN.length) rebuild();
+  if (isSky) {
+    skyResize();
+    document.getElementById("skyHint").textContent =
+      "drag to orbit · scroll to zoom · shift-drag to pan · 0 to reset · click a galaxy";
+    drawSky();
+  }
+}
+
+/* ------------------------------------------------------------------ picking */
+function toWorld(px, py) {
+  return { x:(px - S.tx)/S.scale, y:(py - S.ty)/S.scale };
+}
+function hitTest(px, py) {
+  const p = toWorld(px, py);
+  let best = null, bd = 1e9;
+  for (const n of VN) {
+    if (n.x === undefined) continue;
+    const d = Math.hypot(n.x-p.x, n.y-p.y);
+    if (d <= n.r + 5 && d < bd) { bd = d; best = n; }
+  }
+  return best;
+}
+
+let drag = null;
+cv.addEventListener("mousedown", ev => {
+  drag = { x:ev.clientX, y:ev.clientY, tx:S.tx, ty:S.ty, moved:false };
+  cv.classList.add("dragging");
+});
+addEventListener("mousemove", ev => {
+  if (drag) {
+    const dx = ev.clientX-drag.x, dy = ev.clientY-drag.y;
+    if (Math.abs(dx)+Math.abs(dy) > 3) drag.moved = true;
+    S.tx = drag.tx+dx; S.ty = drag.ty+dy;
+    draw();
+    return;
+  }
+  const n = hitTest(ev.clientX, ev.clientY);
+  const tip = document.getElementById("tip");
+  if (n) {
+    if (S.hover !== n.id) { S.hover = n.id; draw(); }
+    tip.style.display = "block";
+    tip.style.left = Math.min(ev.clientX+13, innerWidth-350) + "px";
+    tip.style.top  = (ev.clientY+15) + "px";
+    tip.textContent = (n.filePath || n.name) +
+      (n.lineRange ? ":" + n.lineRange[0] : "") +
+      (n.loc ? "  ·  " + n.loc + " LOC" : "");
+  } else {
+    if (S.hover) { S.hover = null; draw(); }
+    tip.style.display = "none";
+  }
+});
+addEventListener("mouseup", ev => {
+  if (drag && !drag.moved) {
+    const n = hitTest(ev.clientX, ev.clientY);
+    // In hierarchy mode a click means "open (or close) this level"; the inspector
+    // still updates, so one gesture both reveals and explains.
+    // NOTE: no early return here — the drag cleanup below must always run.
+    if (n && S.hier && (hiddenChildCount(n) > 0 || n.type === "module" ||
+                        S.openFiles.has(n.id))) {
+      select(n.id);
+      toggleExpand(n.id);
+    }
+    // Clicking a folded hub reveals its edges instead of just selecting it —
+    // the badge is a promise that the detail is one click away.
+    else if (n && isFoldedHub(n.id)) {
+      S.expanded.add(n.id);
+      select(n.id);
+      rebuild();
+      draw();
+    } else {
+      select(n ? n.id : null);
+    }
+  }
+  drag = null; cv.classList.remove("dragging");
+});
+cv.addEventListener("wheel", ev => {
+  ev.preventDefault();
+  const k = Math.exp(-ev.deltaY * 0.0013);
+  const ns = Math.max(0.05, Math.min(5, S.scale * k));
+  S.tx = ev.clientX - (ev.clientX - S.tx) * (ns/S.scale);
+  S.ty = ev.clientY - (ev.clientY - S.ty) * (ns/S.scale);
+  S.scale = ns; draw();
+}, { passive:false });
+
+/* ------------------------------------------------------------------ inspector */
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function select(id) {
+  S.selected = id;
+  const box = document.getElementById("info");
+  if (!id) { box.classList.remove("show"); draw(); return; }
+  const n = byId.get(id);
+  if (!n) { box.classList.remove("show"); draw(); return; }
+
+  const cells = [];
+  const push = (k,v) => { if (v !== undefined && v !== null && v !== "")
+    cells.push('<div class="cell"><div class="k">'+k+'</div><div class="v">'+esc(v)+'</div></div>'); };
+  push("LOC", n.loc);
+  push("Layer", LAYER_NAMES[n.layer] || n.layer);
+  push("Imported by", n.fanIn);
+  push("Imports", n.fanOut);
+  push("Language", n.language);
+  push("Files", n.fileCount);
+  push("Symbols", n.defCount);
+  push("Used by", n.usedBy);
+  if (n.lineRange) push("Lines", n.lineRange[0] + "–" + n.lineRange[1]);
+  if (n.importance !== undefined) push("Importance", n.importance.toFixed(3));
+
+  const rel = (list, dir) => {
+    if (!list || !list.length) return '<div class="empty">none</div>';
+    return '<ul class="rel">' + list.slice(0,40).map(e => {
+      const other = byId.get(dir === "out" ? e.target : e.source);
+      if (!other) return "";
+      return '<li data-goto="'+esc(other.id)+'"><span class="ico">'+e.type.slice(0,9)+
+             '</span><span class="nm">'+esc(other.name)+'</span></li>';
+    }).join("") + '</ul>';
+  };
+  const outs = (adjOut.get(id)||[]), ins = (adjIn.get(id)||[]);
+  const kids = (childrenOf.get(id)||[]).map(k => ({ target:k, type:"contains" }));
+
+  box.innerHTML =
+    '<div class="kind">'+esc(n.kind || n.type)+
+      '<button data-ask title="Copy a ready-made question about this node for any LLM">ask ▸</button>'+
+    '</div>' +
+    '<h3>'+esc(n.name)+'</h3>' +
+    '<div class="path">'+esc(n.filePath || n.id)+'</div>' +
+    (n.summary
+      ? '<div class="sum'+(n.summarySource==="docstring"?' doc':'')+'">'+esc(n.summary)+
+        (n.summarySource==="docstring"?'<i>from the file\u2019s docstring</i>':'')+'</div>'
+      : '<div class="sum none">This file has no docstring and no AI summary.</div>') +
+    (n.tags && n.tags.length
+      ? '<div class="tags">'+n.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+'</div>' : "") +
+    '<div class="grid">'+cells.join("")+'</div>' +
+    (n.routes && n.routes.length
+      ? '<h4>Routes</h4><div class="tags">'+n.routes.map(r=>'<span class="tag">'+esc(r)+'</span>').join("")+'</div>' : "") +
+    // What's actually inside this file — the question "what does it define?"
+    (n.symbols && n.symbols.length
+      ? '<h4>Defines <span>'+n.symbols.length+(n.defCount>n.symbols.length?'+':'')+
+        '</span></h4><div class="tags">'+
+        n.symbols.map(s=>'<span class="tag">'+esc(s)+'</span>').join("")+'</div>' : "") +
+    '<h4>Depends on <span>'+outs.length+'</span></h4>' + rel(outs,"out") +
+    '<h4>Used by <span>'+ins.length+'</span></h4>' + rel(ins,"in") +
+    (kids.length ? '<h4>Contains <span>'+kids.length+'</span></h4>' + rel(kids,"out") : "");
+
+  box.classList.add("show");
+  box.querySelectorAll("[data-goto]").forEach(el =>
+    el.onclick = () => focusNode(el.dataset.goto));
+  const askBtn = box.querySelector("[data-ask]");
+  if (askBtn) askBtn.onclick = () => copyAskContext(n);
+  syncUI();                // the focus button depends on there being a selection
+  if (S.neighborhood) rebuild();   // the visible set follows the selection
+  buildPackets();          // re-weight traffic toward the newly focused node
+  draw();
+}
+
+function focusNode(id) {
+  const n = byId.get(id);
+  if (!n) return;
+  const names = ["module","file","symbol"];
+  const want = tier(n);
+  // Hierarchy mode: open the ancestor chain instead of switching detail level.
+  if (S.hier) {
+    if (n.module) openTo(n.module);
+    else if (n.type === "module") openTo(n.id);
+    if (n.filePath && n.id.startsWith("sym:")) S.openFiles.add("file:" + n.filePath);
+  }
+  // Reveal a deeper detail level (and un-hide its layer) so the target can exist.
+  else if (STRUCT[S.view] < want) { S.view = names[want]; }
+  if (n.type === "external" && !S.ext) S.ext = true;
+  S.hiddenLayers.delete(n.layer || "other");
+  syncUI();
+  rebuild();
+  document.querySelectorAll("[data-layer]").forEach(el =>
+    el.classList.toggle("off", S.hiddenLayers.has(el.dataset.layer)));
+  if (n.x !== undefined) {
+    S.scale = Math.max(S.scale, 0.85);
+    S.tx = innerWidth/2 - n.x*S.scale - 40;
+    S.ty = innerHeight/2 - n.y*S.scale;
+  }
+  select(id);
+}
+
+/* ------------------------------------------------------------------ search */
+const searchEl = document.getElementById("search");
+searchEl.addEventListener("input", () => {
+  S.query = searchEl.value.trim();
+  const wrap = document.getElementById("hitsWrap"), ul = document.getElementById("hits");
+  if (!S.query) { wrap.style.display = "none"; draw(); return; }
+  const hits = NODES.filter(matches)
+    .sort((a,b) => (b.importance||0)-(a.importance||0)).slice(0,60);
+  ul.innerHTML = hits.map(n =>
+    '<li data-id="'+esc(n.id)+'" title="'+esc(n.filePath||n.id)+'">'+esc(n.name)+
+    ' <span style="color:var(--fg3)">'+esc((n.layer||""))+'</span></li>').join("")
+    || '<li class="empty">no matches</li>';
+  ul.querySelectorAll("[data-id]").forEach(li =>
+    li.onclick = () => focusNode(li.dataset.id));
+  wrap.style.display = "block";
+  draw();
+});
+
+/* ------------------------------------------------------------------ tours */
+function currentTourNodes() {
+  const t = (G.tour||[])[S.tourIdx];
+  if (!t) return new Set();
+  return new Set(t.steps.map(s => s.nodeId));
+}
+function showTour(i, step = 0) {
+  const tours = G.tour || [];
+  if (!tours.length) return;
+  // Tour steps point at graph nodes, so it can only be followed in explore.
+  if (S.mode !== "explore") setMode("explore");
+  S.tourIdx = ((i % tours.length) + tours.length) % tours.length;
+  S.tourStep = step;
+  const t = tours[S.tourIdx];
+  S.tourStep = Math.max(0, Math.min(step, t.steps.length-1));
+  const st = t.steps[S.tourStep];
+  document.getElementById("tour").classList.add("show");
+  document.getElementById("tTitle").textContent = t.title;
+  document.getElementById("tCount").textContent =
+    (S.tourStep+1) + " / " + t.steps.length +
+    (tours.length > 1 ? "  ·  tour " + (S.tourIdx+1) + "/" + tours.length : "");
+  const n = byId.get(st.nodeId);
+  document.getElementById("tNote").innerHTML =
+    "<b>" + esc(n ? n.name : st.nodeId) + "</b> — " + esc(st.note || "");
+  document.querySelector("#bar div").style.width =
+    ((S.tourStep+1)/t.steps.length*100) + "%";
+  document.getElementById("bTour").classList.add("on");
+  focusNode(st.nodeId);
+}
+function stepTour(d) {
+  const t = (G.tour||[])[S.tourIdx];
+  if (!t) return;
+  const next = S.tourStep + d;
+  if (next < 0) showTour(S.tourIdx-1, 0);
+  else if (next >= t.steps.length) {
+    const tours = G.tour||[];
+    if (S.tourIdx+1 < tours.length) showTour(S.tourIdx+1, 0);
+    else showTour(S.tourIdx, t.steps.length-1);
+  } else showTour(S.tourIdx, next);
+}
+function closeTour() {
+  S.tourIdx = -1;
+  document.getElementById("tour").classList.remove("show");
+  document.getElementById("bTour").classList.remove("on");
+  draw();
+}
+document.getElementById("tPrev").onclick = () => stepTour(-1);
+document.getElementById("tNext").onclick = () => stepTour(1);
+document.getElementById("tClose").onclick = closeTour;
+
+/* ------------------------------------------------------------------ chrome */
+function syncUI() {
+  document.getElementById("view").value = S.view;
+  document.getElementById("bImports").classList.toggle("on", S.imports);
+  document.getElementById("bCalls").classList.toggle("on", S.calls);
+  document.getElementById("bExt").classList.toggle("on", S.ext);
+  document.getElementById("bEntry").classList.toggle("on", S.entries);
+  document.getElementById("bCycles").classList.toggle("on", S.cycles);
+  document.getElementById("bFold").classList.toggle("on", S.foldHubs);
+  document.getElementById("bHier").classList.toggle("on", S.hier);
+  // The detail-level select is meaningless while the hierarchy drives depth.
+  const vsel = document.getElementById("view");
+  if (vsel) vsel.disabled = S.hier;
+  const hood = document.getElementById("bHood");
+  hood.classList.toggle("on", S.neighborhood);
+  hood.disabled = !S.selected;        // meaningless with nothing selected
+  hood.title = S.selected
+    ? "Show only this node and its direct neighbours (N)"
+    : "Select a node first, then focus on its neighbourhood (N)";
+}
+const toggle = (id, key, relayout) => {
+  document.getElementById(id).onclick = () => {
+    S[key] = !S[key]; syncUI();
+    relayout ? rebuild() : draw();
+  };
+};
+toggle("bImports","imports",true);
+toggle("bCalls","calls",true);
+toggle("bExt","ext",true);
+toggle("bHier","hier",true);
+toggle("bFold","foldHubs",true);
+toggle("bHood","neighborhood",true);
+toggle("bEntry","entries",false);
+toggle("bCycles","cycles",false);
+document.getElementById("view").onchange = e => { S.view = e.target.value; rebuild(); };
+document.getElementById("bFit").onclick = () => fit();
+document.getElementById("mOverview").onclick = () => setMode("overview");
+document.getElementById("mStar").onclick = () => setMode("star");
+document.getElementById("mExplore").onclick = () => setMode("explore");
+document.getElementById("bMotion").onclick = () => setMotion(!M.on);
+document.getElementById("bTheme").onclick = () => {
+  const el = document.documentElement;
+  el.dataset.theme = el.dataset.theme === "light" ? "dark" : "light";
+  draw();
+};
+document.getElementById("bTour").onclick = () => {
+  // No alert(): a modal blocks the page and says nothing the UI can't show.
+  // The button is disabled up-front when the graph carries no tours.
+  if (!(G.tour||[]).length) return;
+  S.tourIdx >= 0 ? closeTour() : showTour(0, 0);
+};
+
+addEventListener("keydown", ev => {
+  if (ev.target.tagName === "INPUT") {
+    if (ev.key === "Escape") { ev.target.value=""; S.query=""; 
+      document.getElementById("hitsWrap").style.display="none"; ev.target.blur(); draw(); }
+    return;
+  }
+  if (ev.key === "Tab") {          // Tab cycles overview -> star map -> explore
+    ev.preventDefault();
+    const order = SM ? ["overview", "star", "explore"] : ["overview", "explore"];
+    setMode(order[(order.indexOf(S.mode) + 1) % order.length]);
+    return;
+  }
+  const k = ev.key.toLowerCase();
+  if (k === "/") { ev.preventDefault(); searchEl.focus(); }
+  else if (k === "0") { S.mode === "star" ? skyReset() : fit(); }
+  else if (k === "t") document.getElementById("bTheme").click();
+  else if (k === "p") document.getElementById("bTour").click();
+  else if (k === "escape") { select(null); closeTour(); }
+  else if (k === "[") stepTour(-1);
+  else if (k === "]") stepTour(1);
+  else if (k === " ") { ev.preventDefault(); setMotion(!M.on); }
+  else if (k === "f") document.getElementById("bFold").click();
+  else if (k === "h") document.getElementById("bHier").click();
+  else if (k === "n") { if (!document.getElementById("bHood").disabled)
+    document.getElementById("bHood").click(); }
+});
+
+/* ---- rail ---- */
+let statRows = [];
+
+/** Update just the live counts (edges shown / folded) after a rebuild. */
+function refreshStats() {
+  const row = document.querySelector('#stats [data-live="edges"]');
+  if (row) row.textContent = VE.length + (foldedCount ? "  (−" + foldedCount + ")" : "");
+}
+
+function buildRail() {
+  const p = G.project || {};
+  const st = [
+    ["Files", (G.stats||{}).files_indexed || NODES.filter(n=>tier(n)===1).length],
+    ["Lines of code", (p.totalLoc||0).toLocaleString()],
+    ["Graph nodes", NODES.length],
+    ["Relationships", EDGES.filter(e=>e.type!=="contains").length],
+    ["Edges shown", VE.length + (foldedCount ? "  (−" + foldedCount + " folded)" : "")],
+    ["AI summaries", G.enrichedNodes || 0],
+    ["Cycles", (G.cycles||[]).length],
+  ];
+  statRows = st;   // kept so refreshStats() can redraw counts after a rebuild
+  document.getElementById("stats").innerHTML = st.map(([k,v]) =>
+    '<div class="stat"><span>'+k+'</span><b'+
+    (k === "Edges shown" ? ' data-live="edges"' : '')+'>'+v+'</b></div>').join("");
+  document.getElementById("sub").textContent =
+    (p.languages||[]).slice(0,3).join(" · ") +
+    ((p.frameworks||[]).length ? "  ·  " + p.frameworks.slice(0,3).join(" · ") : "");
+
+  // Entry points: the answer to "where do I start reading?" as a clickable list.
+  const entries = NODES.filter(n => n.isEntry && n.type === "file")
+    .sort((a, b) => (b.importance || 0) - (a.importance || 0)).slice(0, 6);
+  if (entries.length) {
+    document.getElementById("startHere").style.display = "";
+    document.getElementById("entryList").innerHTML = entries.map(n =>
+      '<div data-entry="' + esc(n.id) + '" title="' + esc(n.filePath) + '"><b>' +
+      esc(n.name) + '</b><i>' + esc((n.filePath || "").split("/").slice(0, -1).join("/")) +
+      (n.routes && n.routes.length ? "  ·  " + n.routes.length + " routes" : "") +
+      '</i></div>').join("");
+    document.querySelectorAll("[data-entry]").forEach(el =>
+      el.onclick = () => { setMode("explore"); focusNode(el.dataset.entry); });
+  }
+
+  const counts = {};
+  for (const n of NODES) counts[n.layer||"other"] = (counts[n.layer||"other"]||0) + 1;
+  const order = BAND_ORDER.filter(b => counts[b]);
+  document.getElementById("layers").innerHTML = order.map(b =>
+    '<div class="lyr" data-layer="'+b+'" title="'+esc(
+        (G.layers||[]).find(l=>l.id===b)?.description || "")+'">' +
+    '<span class="dot" style="color:'+layerColor(b)+';background:'+layerColor(b)+'"></span>' +
+    '<span>'+esc(LAYER_NAMES[b]||b)+'</span><span class="ct">'+counts[b]+'</span></div>').join("");
+  document.querySelectorAll("[data-layer]").forEach(el => {
+    // Reflect the initial hidden set (tests start off) so the rail never lies.
+    el.classList.toggle("off", S.hiddenLayers.has(el.dataset.layer));
+    el.onclick = () => {
+      const b = el.dataset.layer;
+      S.hiddenLayers.has(b) ? S.hiddenLayers.delete(b) : S.hiddenLayers.add(b);
+      el.classList.toggle("off", S.hiddenLayers.has(b));
+      rebuild();
+      draw();
+    };
+  });
+}
+
+/* Open the tree along the path to the project's entry point, so the first thing
+   you see is "here is where execution starts" rather than a wall of folders. */
+function openAtEntry() {
+  S.open.clear();
+  S.open.add(ROOT_MOD);
+  const entry = NODES
+    .filter(n => n.isEntry && n.type === "file")
+    .sort((a, b) => (b.importance || 0) - (a.importance || 0))[0];
+  // Open just the first two levels. Walking the whole chain to the entry point
+  // also reveals every sibling at every level (~82 rows on this repo), which
+  // forces a 0.28 scale where the text is unreadable. The reader clicks down; the
+  // rail's "jump to entry" gets them there in one step when they want it.
+  for (const k of (MOD_KIDS.get(ROOT_MOD) || [])) {
+    const kn = byId.get(k);
+    // Expand a lone wrapper directory (src/) since it teaches nothing on its own.
+    if (kn && (MOD_KIDS.get(k) || []).length === 1 && !(MOD_FILES.get(k) || []).length) {
+      S.open.add(k);
+    }
+  }
+  return entry;
+}
+
+/* ---- boot ---- */
+const bootEntry = openAtEntry();
+buildRail(); syncUI(); rebuild(); resize();
+buildOverview();
+// Open on the overview: the 5-second read comes first, detail on demand.
+// A one-box overview teaches nothing, so flat projects land in explore instead.
+const ovWorthShowing = OV && OV.boxes.length >= 2;
+setMode(ovWorthShowing ? "overview" : "explore");
+if (!ovWorthShowing) document.getElementById("mOverview").disabled = !(OV && OV.boxes.length);
+// Tours only exist after the enrich stage; show that state instead of failing on click.
+if (!(G.tour || []).length) {
+  const tb = document.getElementById("bTour");
+  tb.disabled = true;
+  tb.title = "No guided tours — run the enrich stage to generate them";
+}
+setMotion(!REDUCED);
+requestAnimationFrame(frame);
+if ((G.tour||[]).length && location.hash === "#tour") showTour(0,0);
+const h = decodeURIComponent(location.hash.replace(/^#(focus=)?/,""));
+if (h && byId.has(h)) focusNode(h);
+</script>
+</body>
+</html>

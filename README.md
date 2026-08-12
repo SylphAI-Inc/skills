@@ -52,6 +52,8 @@ After installation, see all your available skills:
 | [posthog-analytics](./skills/posthog-analytics/SKILL.md) | Automate PostHog dashboard creation, sync, and export via API |
 | [clone-anywebsite](./skills/clone-anywebsite/SKILL.md) | Clone any website's landing page with pixel-perfect fidelity — visual-first workflow with sniper CSS extraction, animation detection, and mandatory Builder+Evaluator pattern |
 | [glowmotion](./skills/glowmotion/SKILL.md) | Create premium animated technical diagrams (flowcharts, architecture diagrams, Mermaid conversions) as single self-contained HTML+SVG files with glowing comet-dot flows, pulsing highlights, and a built-in light/dark theme toggle |
+| [codegraph](./skills/codegraph/SKILL.md) | Turn any codebase into an explorable interactive graph — deterministic structural scan (imports, symbols, PageRank importance, architectural layers, dependency cycles, entry points) plus AI summaries and guided tours, delivered as one self-contained HTML file |
+| [finger-frame-ai](./skills/finger-frame-ai/SKILL.md) | Generate an AI-restyled world inside a tracked two-hand finger-frame gesture using Gemini Omni, MediaPipe, and FFmpeg |
 
 ### SWE CLI Skills (`swe-cli-skills` plugin)
 
@@ -91,6 +93,9 @@ See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on
 └── skills/                    # All skills organized by name
     ├── clone-anywebsite/
     │   └── SKILL.md
+    ├── codegraph/              # Interactive codebase graph generator
+    │   ├── SKILL.md
+    │   └── scripts/
     ├── create-skill/
     │   └── SKILL.md
     ├── glowmotion/             # Animated HTML+SVG diagram generator
