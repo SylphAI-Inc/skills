@@ -1,6 +1,6 @@
 # AdaL Skills Marketplace
 
-Essential skills for teams and developers building software with best engineering practices and 10x productivity. Compatible with [AdaL CLI](https://sylph.ai) and Claude Code.
+Essential skills for teams and developers building software with best engineering practices and 10x productivity. Compatible with [AdaL CLI](https://sylph.ai) — the automation-first agent harness — and Claude Code.
 
 ## Installation
 
