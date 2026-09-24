@@ -54,6 +54,7 @@ After installation, see all your available skills:
 | [glowmotion](./skills/glowmotion/SKILL.md) | Create premium animated technical diagrams (flowcharts, architecture diagrams, Mermaid conversions) as single self-contained HTML+SVG files with glowing comet-dot flows, pulsing highlights, and a built-in light/dark theme toggle |
 | [codegraph](./skills/codegraph/SKILL.md) | Turn any codebase into an explorable interactive graph — deterministic structural scan (imports, symbols, PageRank importance, architectural layers, dependency cycles, entry points) plus AI summaries and guided tours, delivered as one self-contained HTML file |
 | [finger-frame-ai](./skills/finger-frame-ai/SKILL.md) | Generate an AI-restyled world inside a tracked two-hand finger-frame gesture using Gemini Omni, MediaPipe, and FFmpeg |
+| [ledger-tasks-yylo](./skills/ledger-tasks-yylo/SKILL.md) | Operate a [YYLO Ledger](https://github.com/yylo-dev/yylo-ledger) Kanban board from the command line - create, search, update, and finish tasks with response receipts, manage blocked-by dependencies, and compute ready and ordered work with the [yy](https://github.com/yylo-dev/yylo) CLI |
 
 ### SWE CLI Skills (`swe-cli-skills` plugin)
 

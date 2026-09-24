@@ -20,7 +20,8 @@
         "./skills/glowmotion",
         "./skills/codegraph",
         "./skills/finger-frame-ai",
-        "./skills/model-office"
+        "./skills/model-office",
+        "./skills/ledger-tasks-yylo"
       ]
     },
     {
