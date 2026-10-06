@@ -77,6 +77,14 @@ Install: `/plugin install swe-cli-skills@adal-agent-skills`
 
 See the full [swe-cli-skills README](./skills/swe-cli-skills/README.md) for details.
 
+### Career skills (`career-skills` plugin)
+
+| Skill | Description |
+|-------|-------------|
+| [job-application-assistant](./skills/job-application-assistant/SKILL.md) | Find and assess roles with Rezi MCP, match requirements to resume evidence, and prepare truthful application materials with your chosen CV workflow. |
+
+Install with `/plugin install career-skills@adal-agent-skills`. Configure Rezi MCP separately to use its job-search and resume-reading features; you can also provide a job posting and resume content yourself. The skill keeps Rezi writes opt-in.
+
 ## Creating Your Own Skills
 
 See the [create-skill](./skills/create-skill/SKILL.md) guide for instructions on:
