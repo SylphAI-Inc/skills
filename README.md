@@ -54,6 +54,7 @@ After installation, see all your available skills:
 | [glowmotion](./skills/glowmotion/SKILL.md) | Create premium animated technical diagrams (flowcharts, architecture diagrams, Mermaid conversions) as single self-contained HTML+SVG files with glowing comet-dot flows, pulsing highlights, and a built-in light/dark theme toggle |
 | [codegraph](./skills/codegraph/SKILL.md) | Turn any codebase into an explorable interactive graph — deterministic structural scan (imports, symbols, PageRank importance, architectural layers, dependency cycles, entry points) plus AI summaries and guided tours, delivered as one self-contained HTML file |
 | [finger-frame-ai](./skills/finger-frame-ai/SKILL.md) | Generate an AI-restyled world inside a tracked two-hand finger-frame gesture using Gemini Omni, MediaPipe, and FFmpeg |
+| [glasser-product-to-prospects](./skills/glasser-product-to-prospects/SKILL.md) | Propose an ICP from a product URL or local README/codebase, confirm filters, then use Glasser's existing prospect-list workflow for a priced ten-account pilot |
 
 ### SWE CLI Skills (`swe-cli-skills` plugin)
 
