@@ -8,10 +8,10 @@ Use the user's chosen transport. Otherwise follow the current canonical Glasser 
 
 ### AdaL native HTTP MCP
 
-AdaL documents custom HTTP servers and OAuth. Glasser documents a stateless Streamable HTTP server with URL-only OAuth discovery. The combined configuration proposed for AdaL is:
+Add Glasser using AdaL's built-in MCP shortcut:
 
 ```text
-/mcp add glasser --transport http --url https://api.glasser.ai/mcp
+/mcp add glasser
 ```
 
 Adding an OAuth-capable server can open the browser immediately. With setup authorization, the user signs into Glasser, selects a Workspace, and approves access. Glasser creates a Workspace Key for the client; disconnecting the client does not revoke that Key. Revocation is managed in Glasser. Never request, read, or print token values.
